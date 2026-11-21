@@ -1,0 +1,115 @@
+name: Issue Triage (AI)
+
+# Roadmap 4.13 (#3227). A once-daily GitHub Action that labels and replies
+# to issues opened by people outside the team, using docs/spec/ as its
+# reference. No OpenClaw agent at run time: runs on GitHub's own schedule,
+# with GITHUB_TOKEN, calling the Anthropic API directly with the
+# TRIAGE_API_KEY repo secret. Scope: Reed's audited comment on #3227
+# (https://github.com/ThreeLaneStudios/pane/issues/3227#issuecomment-6856537748),
+# plus Matt's two amendments (fixed-template replies for needs-repro /
+# needs-spec-section when the model pipeline produces no reply; no em
+# dashes anywhere in any prompt or reply text).
+#
+# SHIPS DISABLED. The `schedule:` trigger below is commented out on
+# purpose, so no scheduled run can fire until a human edits this file.
+# Matt enables it at 5.5 by:
+#   1. Uncommenting the `schedule:` block below (pick the cron Matt wants;
+#      "once a day" per the issue, left as a placeholder here).
+#   2. ANTHROPIC_MODEL (env, below) is confirmed, not a placeholder:
+#      claude-sonnet-5-5 is the real, Active Anthropic model id for
+#      "Sonnet 5.5" (from the Claude 4.6 generation onward, ids are
+#      dateless, claude-{name}-{major}[-{minor}], verified against
+#      Anthropic's live model-id docs, see #3227). Nothing left to do here.
+#   3. Setting FLOOR_DATE_FALLBACK (env, below) to the date he enables it,
+#      so the first scheduled run (which carries no workflow_dispatch
+#      inputs) does not retroactively triage the entire pre-existing
+#      backlog of outside-authored open issues (440 issues, per the dry
+#      run that surfaced this, run 43472933508). A manual run instead
+#      uses the floor_date input below, defaulted to today.
+#   4. Confirming the TRIAGE_API_KEY repository secret exists with its
+#      spend cap (already Matt's stated plan; this workflow does not
+#      create or manage that secret).
+# Until all four are done, the only way to run this at all is a manual
+# `workflow_dispatch`, which defaults to dry-run (see `dry_run` input).
+#
+# Reed Gate: this file and its scripts live under .github/workflows/
+# (including .github/workflows/scripts/, not root scripts/), so this PR
+# trips the gate regardless of #3226's outcome, by design, see PR body.
+
+on:
+  # SHIPS DISABLED, Matt uncomments this block at 5.5. Cron is a
+  # placeholder (13:00 UTC daily); confirm the exact time with Matt before
+  # uncommenting.
+  # schedule:
+  #   - cron: '0 13 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (no GitHub writes). Scheduled runs are always live; this input only applies to a manual run."
+        type: boolean
+        default: true
+      scope:
+        description: "Candidate scope. unprocessed-only matches live filtering (floor date + triage-processed exclusion). all-open-non-team audits every open issue from a non-team author, ignoring both, for a full-backlog dry-run audit."
+        type: choice
+        options:
+          - unprocessed-only
+          - all-open-non-team
+        default: unprocessed-only
+      issue_numbers:
+        description: "Optional comma-separated issue numbers to target directly (bypasses the open-issues listing and the floor date). Dry-run only, refused when combined with dry_run=false. TEST HOOK: when dry_run is true AND this is set, the team-author check is skipped for exactly these issues (and no others), so the non-team pipeline can be exercised against a team-authored issue on a private repo with no outside-author issue yet to test against. Never active on a scheduled run or a live manual run."
+        type: string
+        default: ""
+      floor_date:
+        description: "Floor date (YYYY-MM-DD) for unprocessed-only scope: issues created before this date are excluded. Defaults to today; keep current when running manually. Has no effect on a scheduled run, which has no workflow_dispatch inputs and always falls back to the FLOOR_DATE_FALLBACK env value below."
+        type: string
+        default: "2026-11-13"
+
+permissions:
+  issues: write
+  contents: read
+
+concurrency:
+  group: issue-triage-ai
+  cancel-in-progress: false
+
+env:
+  # Confirmed, not a placeholder: claude-sonnet-5-5 is the real, Active
+  # Anthropic model id for "Sonnet 5.5". From the Claude 4.6 generation
+  # onward, model ids are dateless (claude-{name}-{major}[-{minor}]);
+  # verified against Anthropic's live model-id docs (#3227).
+  ANTHROPIC_MODEL: claude-sonnet-5-5
+  # Scheduled-run fallback ONLY. A schedule trigger carries no
+  # workflow_dispatch inputs, so this hardcoded value is what FLOOR_DATE
+  # resolves to on that path (see the step env below). Set to the date
+  # Matt flips the schedule on (5.5), so the first scheduled run does not
+  # retroactively triage the entire pre-existing backlog of
+  # outside-authored open issues (440 issues, per the dry run that
+  # surfaced this, run 43472933508; see the scope comment, §4). A manual
+  # workflow_dispatch run instead uses the floor_date input above,
+  # defaulted to today, and never reads this value.
+  FLOOR_DATE_FALLBACK: "2026-11-13"
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+
+      - name: Run issue-triage-ai
+        run: node .github/workflows/scripts/issue-triage-ai.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          TRIAGE_API_KEY: ${{ secrets.TRIAGE_API_KEY }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          SCOPE: ${{ github.event.inputs.scope }}
+          ISSUE_NUMBERS: ${{ github.event.inputs.issue_numbers }}
+          # workflow_dispatch's floor_date input takes precedence; a
+          # scheduled run has no inputs context, so this falls back to
+          # FLOOR_DATE_FALLBACK (env, above) and must never resolve empty.
+          FLOOR_DATE: ${{ github.event.inputs.floor_date || env.FLOOR_DATE_FALLBACK }}

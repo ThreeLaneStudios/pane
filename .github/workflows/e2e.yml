@@ -1,0 +1,75 @@
+name: E2E — Playwright (self-hosted)
+
+# #3106 C1 (Reed's security review): self-hosted + pull_request is an RCE
+# surface once this repo has forks -- a fork PR's own code runs on Matt's
+# Studio hardware. This job's own continue-on-error/failure-annotation step
+# already says it isn't trusted for signal (headless runner, see #514;
+# manual pre-release testing via Quinn is the real check), so moving it to
+# manual-trigger-only loses nothing that was providing real confidence.
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e-tier1:
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 15
+    continue-on-error: true
+    env:
+      PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add Rust toolchain to PATH
+        run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Start Pane in test mode (background)
+        run: |
+          # Build and launch Pane in test mode, backgrounded so Playwright can connect
+          cd src-tauri
+          PANE_TEST_MODE=1 BUILD_APPROVED_BY=matt ROOT_CAUSE_CONFIRMED=1 SPEC_SKIP_APPROVED_BY=matt cargo run > /tmp/pane-test.log 2>&1 &
+          PANE_PID=$!
+          echo "PANE_PID=$PANE_PID" >> $GITHUB_ENV
+          echo "Pane starting (PID $PANE_PID), waiting for test socket..."
+          # Wait for the test socket to appear (up to 3 minutes for first compile)
+          for i in $(seq 1 180); do
+            if [ -e /tmp/tauri-playwright.sock ]; then
+              echo "✅ Pane test socket ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          if [ ! -e /tmp/tauri-playwright.sock ]; then
+            echo "❌ Pane test socket not found after 180s"
+            echo "Last 50 lines of Pane log:"
+            tail -50 /tmp/pane-test.log
+            exit 1
+          fi
+
+      - name: Run Playwright Tier 1
+        id: e2e-test
+        run: npx playwright test --config=e2e/playwright.config.ts --project=tier1
+
+      - name: Annotate E2E failure
+        if: steps.e2e-test.outcome == 'failure'
+        run: |
+          echo "::warning::E2E tests failed (expected — headless runner, see #514). Manual pre-release testing via Quinn."
+
+      - name: Stop Pane
+        if: always()
+        run: |
+          if [ -n "$PANE_PID" ]; then
+            kill $PANE_PID 2>/dev/null || true
+          fi
+          # Clean up test socket
+          rm -f /tmp/tauri-playwright.sock
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: e2e/test-results/
+          retention-days: 7

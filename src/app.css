@@ -1,0 +1,331 @@
+/* ============================
+   Trove — Design System
+   Warm neutrals, deep teal accent
+   ============================ */
+
+
+
+/* ============================================================
+   Attachment design tokens — global (theme-independent)
+   #401 PR1: --at-card-h is the single canonical collapsed-card
+   height used by every attachment type (PR2+ consumes this).
+   ============================================================ */
+:root {
+  --at-card-h: 64px;      /* one fixed height across ALL attachment types */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', ui-monospace, monospace;
+  --dur-fast: 120ms;
+  --dur-norm: 250ms;    /* dismiss slide-out and medium transitions — #1811 PR5 */
+  --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* === Dark Theme (SHIPPING DEFAULT) === */
+/* :root holds dark values so every component gets dark tokens on cold-start,
+   regardless of the $effect timing race between writable(false) and onMount. */
+:root,
+[data-theme="dark"] {
+  --bg-primary: rgba(255,255,255,0.05);
+  --bg-secondary: #2C2C2E;
+  --bg-tertiary: #3C3C3E;
+  --bg-sidebar: #1A1A1C;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(13, 115, 119, 0.15);
+  --bg-search: #2A2A2C;
+  --bg-code: rgba(0, 228, 228, 0.08);
+  --bg-code-block: #252527;
+
+  --text-primary: #F0EDE8;
+  --text-secondary: #A0A0A0;
+  --text-tertiary: #666666;
+  --text-code: #5DC8CC;
+
+  --sidebar-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --border-color: rgba(255, 255, 255, 0.08);
+
+  --accent: #00E4E4;
+  --accent-hover: #33EEDD;
+  --accent-light: rgba(0, 228, 228, 0.15);
+  --accent-light-border: rgba(0, 228, 228, 0.4);
+  --accent-soft: rgba(0, 228, 228, 0.18);   /* icon tile tint for active mode — PR2 */
+
+  --error-color: #ef4444;
+  --warning-color: #f59e0b;
+  --success-color: #10b981;
+
+  /* Syntax highlighting - dark */
+  --syntax-comment: #636669;
+  --syntax-keyword: #C792EA;
+  --syntax-string: #C3E88D;
+  --syntax-number: #F78C6C;
+  --syntax-function: #82AAFF;
+  --syntax-attr: #FF5370;
+
+  /* ── Attachment design-system canonical tokens (dark) ─────────────
+     Named to match attachments.css / LOCKED-DESIGN-SPEC.md.
+     PR2+ components consume these names directly.
+     ---------------------------------------------------------------- */
+  --bg: #0a0a0f;
+  --fg-1: var(--text-primary);
+  --fg-2: var(--text-secondary);
+  --fg-3: var(--text-tertiary);
+  --fg-4: #444444;
+  --fg-on-accent: #0a0a0f;          /* dark text on cyan button/icon */
+
+  --surface-1: #161618;
+  --surface-2: #1c1c20;
+  --surface-3: #232327;
+
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --border-faint: rgba(255, 255, 255, 0.05);
+  --sheet-border-styled: rgba(255, 255, 255, 0.7);
+
+  --overlay-hover:  rgba(255, 255, 255, 0.06);
+  --overlay-press:  rgba(255, 255, 255, 0.10);
+
+  --shadow-pop: 0 4px 20px rgba(0, 0, 0, 0.55), 0 1px 6px rgba(0, 0, 0, 0.30);
+
+  --status-success: #22c55e;
+  --status-success-glow: rgba(34, 197, 94, 0.15);
+  --status-error-soft: rgba(239, 68, 68, 0.08);
+  --status-error-border: rgba(239, 68, 68, 0.25);
+  --status-danger:  #ef4444;
+  --status-warning: #F59E0B;   /* amber — due today, kanban in-progress */
+
+  /* ── Radii — note-blocks design system tokens (§24.2) ───────────────────
+     Named to match colors_and_type.css. Consumed by ChecklistNodeView and
+     future note-block components.
+     --------------------------------------------------------------------- */
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-pill: 999px;
+
+  --shadow-input-focus: 0 0 0 1px var(--accent);
+}
+
+/* === Light Theme (DORMANT — future feature; scaffolding preserved) === */
+/* When Pane ships a real light-mode toggle, wire a UI switch that sets
+   data-theme="light" on <html>. Every token is already defined here. */
+[data-theme="light"] {
+  --bg-primary: #e0e0e0;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #efefef;
+  --bg-sidebar: #f8f8f8;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(13, 115, 119, 0.08);
+  --bg-search: #F0ECE4;
+  --bg-code: rgba(0, 228, 228, 0.06);
+  --bg-code-block: #F5F2EC;
+
+  --text-primary: #1A1A1A;
+  --text-secondary: #555555;
+  --text-tertiary: #999999;
+  --text-code: #0D7377;
+
+  --sidebar-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --border-color: rgba(0, 0, 0, 0.08);
+
+  --accent: #00E4E4;
+  --accent-hover: #00D4D4;
+  --accent-light: rgba(0, 228, 228, 0.1);
+  --accent-light-border: rgba(0, 228, 228, 0.3);
+  --accent-soft: rgba(0, 228, 228, 0.15);   /* icon tile tint for active mode — PR2 */
+
+  --error-color: #ef4444;
+  --warning-color: #f59e0b;
+  --success-color: #10b981;
+
+  /* Syntax highlighting - light */
+  --syntax-comment: #8E908C;
+  --syntax-keyword: #8959A8;
+  --syntax-string: #718C00;
+  --syntax-number: #F5871F;
+  --syntax-function: #4271AE;
+  --syntax-attr: #C82829;
+
+  /* ── Attachment design-system canonical tokens (light) ─────────────
+     Named to match attachments.css / LOCKED-DESIGN-SPEC.md.
+     PR2+ components consume these names directly.
+     ---------------------------------------------------------------- */
+  --bg: var(--bg-secondary);
+  --fg-1: var(--text-primary);
+  --fg-2: var(--text-secondary);
+  --fg-3: var(--text-tertiary);
+  --fg-4: #bbbbbb;
+  --fg-on-accent: #0a0a0f;          /* dark text on cyan button/icon */
+
+  --surface-1: #ececec;
+  --surface-2: #e4e4e4;
+  --surface-3: #f5f5f5;
+
+  --border: rgba(0, 0, 0, 0.10);
+  --border-strong: rgba(0, 0, 0, 0.22);
+  --border-faint: rgba(0, 0, 0, 0.055);
+  --sheet-border-styled: rgba(255, 255, 255, 0.7);
+
+  --overlay-hover:  rgba(0, 0, 0, 0.05);
+  --overlay-press:  rgba(0, 0, 0, 0.09);
+
+  --shadow-pop: 0 4px 16px rgba(0, 0, 0, 0.14), 0 1px 4px rgba(0, 0, 0, 0.08);
+
+  --status-danger: #ef4444;
+}
+
+/* === Global Styles === */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #0a0a0f !important;
+  color: #e0e0e0;
+}
+
+/* Force dark text color on ALL form elements — macOS WebKit doesn't inherit */
+input, select, textarea, option, button {
+  color: inherit;
+  font-family: inherit;
+}
+
+select option {
+  background: rgba(255,255,255,0.05);
+  color: #e0e0e0;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* Selection */
+::selection {
+  background: rgba(0, 228, 228, 0.35);
+  color: #e0e0e0;
+}
+
+input::selection,
+select::selection,
+textarea::selection {
+  background: rgba(0, 228, 228, 0.4);
+  color: #e0e0e0;
+}
+
+/* Focus */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Disable text selection on UI elements */
+button, nav, aside {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Smooth transitions for theme switching */
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* #2339 PR 15c — New Sheet button outline treatment.
+   Ported concept from docs/design/sheets/sheets.css's ADDENDUM .btn--outline
+   ("identical geometry [to .btn--primary], transparent ground, cyan border and
+   label" — .btn--ghost was explicitly rejected as too recessive to read as a
+   sibling, per the addendum's own annotation).
+   This app has no shared global .btn/.btn--primary box model — every host view
+   (KanbanBoard, AllTasksView, NotesBrowser) still hardcodes its own local New
+   Note button geometry (scoped Svelte styles, not this file). Rather than force
+   a brand-new shared .btn box onto three already-established, independently-
+   sized buttons (a much larger unrelated refactor), .btn--outline here is
+   FILL-ONLY: background/color/border-color/hover. Each call site applies it
+   alongside its own existing scoped geometry class (padding/radius/font/gap),
+   so New Sheet keeps matching ITS OWN New Note's exact box model at each site,
+   with only the fill inverted — the addendum's actual premise ("same box,
+   inverted ground") — without literally sharing a DOM class for geometry.
+   NOT .btn--ghost — rejected in the locked addendum ("Its fg-3 label on a
+   faint border reads as tertiary — a 'more options' affordance — not as the
+   second of two ways to create something"). */
+.btn--outline {
+  background: transparent;
+  color: var(--accent);
+  border-color: rgba(0, 228, 228, 0.42);
+}
+
+.btn--outline:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* #2339 PR 15b-alpha — Shared Sheets popover shell (`.sh-pop*`).
+   Ported verbatim (class names + rules) from docs/design/sheets/sheets.css
+   L207-224. Previously duplicated in full in `ShHeaderMenu.svelte`'s and
+   `SheetCellEditorSelect.svelte`'s own scoped <style> blocks — every
+   sheet popover (header menu, cell dropdown editors, the error detail
+   popover, the toolbar export/overflow menu) now shares this ONE global
+   definition. Deliberately does NOT include `top`/`left`/`width`
+   positioning — those vary per call site (boundary-flip, cell-anchored
+   offset, etc.) and stay as small scoped overrides in each component
+   that mounts a `.sh-pop`. `.sh-pop__i:disabled` isn't in the design's
+   own canonical block but is included here since it's real, needed
+   (ShHeaderMenu's Filter row) shared behavior, not a one-off. */
+.sh-pop { position: absolute; z-index: 30; background: #1c1c20; border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: var(--shadow-pop); padding: 5px; min-width: 168px; box-sizing: border-box; }
+.sh-pop__lab { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-4); padding: 7px 9px 5px; }
+.sh-pop__i { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; border: 0; background: transparent; border-radius: var(--radius-sm); color: var(--fg-2); font-family: var(--font-sans); font-size: 13px; text-align: left; cursor: pointer; }
+.sh-pop__i:hover { background: var(--overlay-hover); color: var(--fg-1); }
+.sh-pop__i:disabled { color: var(--fg-4); cursor: not-allowed; opacity: 0.55; }
+.sh-pop__i:disabled:hover { background: transparent; color: var(--fg-4); }
+.sh-pop__i.is-on { color: var(--fg-1); }
+.sh-pop__i.is-on .sh-pop__tick { opacity: 1; }
+.sh-pop__tick { margin-left: auto; color: var(--accent); opacity: 0; flex-shrink: 0; }
+.sh-pop__ico { width: 16px; flex-shrink: 0; display: flex; justify-content: center; color: var(--fg-3); }
+.sh-pop__i:hover .sh-pop__ico { color: var(--fg-2); }
+.sh-pop__kb { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4); }
+.sh-pop__hr { height: 1px; background: var(--border-faint); margin: 5px 3px; }
+.sh-pop__danger { color: var(--status-danger); }
+.sh-pop__danger .sh-pop__ico { color: var(--status-danger); }
+.sh-pop__danger:hover { background: rgba(239, 68, 68, 0.1); color: var(--status-danger); }
+.sh-pop__in { width: 100%; box-sizing: border-box; background: var(--surface-2); border: 1px solid var(--accent); border-radius: var(--radius-sm); padding: 7px 9px; color: var(--fg-1); font-family: var(--font-sans); font-size: 13px; margin: 2px 0 4px; }
+.sh-pop__sub { font-size: 11.5px; color: var(--fg-4); padding: 2px 9px 7px; line-height: 1.45; }
+
+/* #2339 PR 15b-beta — `.sh-src*` source-label chips (version-history source
+   labels). Ported verbatim (class names + rules) from
+   docs/design/sheets/sheets.css L294-299, same global-extraction pattern as
+   the `.sh-pop` block above: consumed by `ShSrcLabel.svelte` (the
+   sheet/agent/restore/manual version-history source chip), which has no
+   `<style>` block of its own — the CSS lives here as globals instead. One
+   substitution from the design source: the design targeted an inline
+   `<svg>` glyph via a descendant selector; the real component renders its
+   glyph in a dedicated `__ico` span instead, so the selector below
+   reflects the actual markup, not the design's `<svg>` target. */
+.sh-src { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 500; letter-spacing: 0.02em; padding: 2px 7px; border-radius: 4px; background: var(--surface-2); color: var(--fg-3); max-width: 100%; }
+.sh-src__ico { flex-shrink: 0; }
+.sh-src--sheet { background: var(--accent-soft); color: var(--accent); }
+.sh-src--agent { background: rgba(139, 92, 246, 0.14); color: #a78bfa; }
+.sh-src--restore { background: rgba(245, 158, 11, 0.14); color: var(--status-warning); }
+.sh-src__n { font-family: var(--font-mono); font-size: 10px; opacity: 0.8; }

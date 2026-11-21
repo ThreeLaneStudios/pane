@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pane Card Final Design</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; color: #fff; font-family: system-ui, -apple-system, sans-serif; padding: 32px; }
+h1 { font-size: 16px; color: rgba(255,255,255,0.5); margin-bottom: 24px; font-weight: 400; letter-spacing: 0.5px; }
+h2 { font-size: 13px; color: rgba(255,255,255,0.35); margin-bottom: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px; }
+.layout { display: flex; gap: 48px; }
+.column { display: flex; flex-direction: column; gap: 6px; }
+.wide-col { width: 480px; }
+.narrow-col { width: 250px; }
+.card-wide {
+  height: 120px; background: rgba(255,255,255,0.05); border-radius: 6px; padding: 8px;
+  display: flex; flex-direction: column; justify-content: space-between; border-left: 3px solid transparent;
+}
+.card-narrow {
+  height: 80px; background: rgba(255,255,255,0.05); border-radius: 6px; padding: 8px;
+  display: flex; flex-direction: column; justify-content: space-between; border-left: 3px solid transparent;
+}
+.status-todo { border-left-color: #00E4E4; }
+.status-progress { border-left-color: #FF8C00; }
+.status-done { border-left-color: #00C853; }
+.active { background: rgba(0,228,228,0.06); }
+.row { display: flex; align-items: center; gap: 6px; min-height: 16px; }
+.row-meta { min-height: 14px; }
+.title { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.preview { font-size: 11px; color: rgba(255,255,255,0.4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
+.pill-priority {
+  font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px;
+  white-space: nowrap; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.3px;
+}
+.pill-priority.urgent { background: rgba(255,68,68,0.2); color: #FF4444; }
+.pill-priority.high { background: rgba(255,140,0,0.2); color: #FF8C00; }
+.pill-priority.medium { background: rgba(255,214,0,0.2); color: #FFD600; }
+.pill-priority.low { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.3); }
+.folder { font-size: 10px; color: rgba(255,255,255,0.25); white-space: nowrap; flex-shrink: 0; }
+.pill-assignee {
+  font-size: 10px; padding: 1px 6px; border-radius: 3px;
+  border: 1px solid rgba(0,228,228,0.4); color: #00E4E4; white-space: nowrap; flex-shrink: 0;
+}
+.due { font-size: 10px; color: rgba(255,255,255,0.35); white-space: nowrap; }
+.subtasks { font-size: 10px; color: rgba(255,255,255,0.35); white-space: nowrap; margin-left: auto; }
+.hidden { visibility: hidden; }
+</style>
+</head>
+<body>
+<h1>Pane — Card Final Design</h1>
+<div class="layout">
+<div>
+  <h2>Wide (480 × 120)</h2>
+  <div class="column wide-col">
+    <div class="card-wide status-todo active">
+      <div class="row"><span class="title">Trunk</span><span class="pill-priority high">High</span><span class="folder">Cabinet</span></div>
+      <div class="row"><span class="preview">The trunk is one of the defining features of the Volkswagen</span></div>
+      <div class="row"><span class="preview">Beetle, known for its front-mounted trunk or "frunk" design...</span></div>
+      <div class="row row-meta"><span class="pill-assignee">Matt</span><span class="due">Apr 2, 2026</span><span class="subtasks">⊟ 2</span></div>
+    </div>
+    <div class="card-wide">
+      <div class="row"><span class="title">This is in doors</span><span class="pill-priority hidden">—</span><span class="folder">Cabinet</span></div>
+      <div class="row"><span class="preview">asdfsdafasdfasdf</span></div>
+      <div class="row"><span class="preview hidden">—</span></div>
+      <div class="row row-meta"><span class="pill-assignee hidden">—</span><span class="due hidden">—</span><span class="subtasks hidden">—</span></div>
+    </div>
+    <div class="card-wide status-progress">
+      <div class="row"><span class="title">Sidedoor</span><span class="pill-priority urgent">Urgent</span><span class="folder hidden">—</span></div>
+      <div class="row"><span class="preview hidden">—</span></div>
+      <div class="row"><span class="preview hidden">—</span></div>
+      <div class="row row-meta"><span class="pill-assignee hidden">—</span><span class="due">Apr 10, 2026</span><span class="subtasks hidden">—</span></div>
+    </div>
+    <div class="card-wide">
+      <div class="row"><span class="title">Suicide Doors</span><span class="pill-priority hidden">—</span><span class="folder">Cabinet</span></div>
+      <div class="row"><span class="preview hidden">—</span></div>
+      <div class="row"><span class="preview hidden">—</span></div>
+      <div class="row row-meta"><span class="pill-assignee hidden">—</span><span class="due hidden">—</span><span class="subtasks hidden">—</span></div>
+    </div>
+  </div>
+</div>
+<div>
+  <h2>Narrow (250 × 80)</h2>
+  <div class="column narrow-col">
+    <div class="card-narrow status-todo active">
+      <div class="row"><span class="title">Trunk</span><span class="pill-priority high">High</span><span class="folder">Cabinet</span></div>
+      <div class="row" style="flex:1"></div>
+      <div class="row row-meta"><span class="pill-assignee">Matt</span><span class="due">Apr 2, 2026</span><span class="subtasks">⊟ 2</span></div>
+    </div>
+    <div class="card-narrow">
+      <div class="row"><span class="title">This is in doors</span><span class="pill-priority hidden">—</span><span class="folder">Cabinet</span></div>
+      <div class="row" style="flex:1"></div>
+      <div class="row row-meta"><span class="pill-assignee hidden">—</span><span class="due hidden">—</span><span class="subtasks hidden">—</span></div>
+    </div>
+    <div class="card-narrow status-progress">
+      <div class="row"><span class="title">Sidedoor</span><span class="pill-priority urgent">Urgent</span><span class="folder hidden">—</span></div>
+      <div class="row" style="flex:1"></div>
+      <div class="row row-meta"><span class="pill-assignee hidden">—</span><span class="due">Apr 10, 2026</span><span class="subtasks hidden">—</span></div>
+    </div>
+    <div class="card-narrow">
+      <div class="row"><span class="title">Suicide Doors</span><span class="pill-priority hidden">—</span><span class="folder">Cabinet</span></div>
+      <div class="row" style="flex:1"></div>
+      <div class="row row-meta"><span class="pill-assignee hidden">—</span><span class="due hidden">—</span><span class="subtasks hidden">—</span></div>
+    </div>
+  </div>
+</div>
+</div>
+</body>
+</html>

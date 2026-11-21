@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module Cards v3 — Pane Home</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; display: flex; justify-content: center; padding: 32px 0; }
+  .stack { width: 300px; display: flex; flex-direction: column; gap: 8px; }
+  .card { background: rgba(255,255,255,0.05); border-radius: 6px; padding: 14px; }
+  .card-title { font-size: 13px; font-weight: 600; color: #fff; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .body { font-size: 12px; color: rgba(255,255,255,0.6); }
+  .dimmed { font-size: 10px; color: rgba(255,255,255,0.3); }
+  .objectives-text { font-size: 13px; color: rgba(255,255,255,0.65); line-height: 1.6; }
+  .lane-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+  .emoji-slot { width: 20px; height: 20px; border-radius: 50%; border: 1px dashed rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; font-size: 11px; cursor: pointer; flex-shrink: 0; }
+  .emoji-slot.filled { border: none; }
+  .lane-label { font-size: 12px; color: #fff; font-weight: 600; }
+  .lane-desc { font-size: 12px; color: rgba(255,255,255,0.4); }
+  .task-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .task-cb { width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid rgba(255,255,255,0.2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .task-cb.checked { background: #00E4E4; border-color: #00E4E4; }
+  .task-cb.checked::after { content: '✓'; font-size: 9px; color: #0a0a0f; font-weight: 700; }
+  .task-text { font-size: 12px; color: rgba(255,255,255,0.6); flex: 1; }
+  .task-text.done { text-decoration: line-through; color: rgba(255,255,255,0.3); }
+  .task-project { font-size: 10px; color: rgba(255,255,255,0.3); flex-shrink: 0; }
+  .add-task { font-size: 11px; color: #00E4E4; cursor: pointer; margin-top: 6px; }
+  .team-row { display: grid; grid-template-columns: 28px 1fr 8px 56px; align-items: center; gap: 6px; padding: 4px 0; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; font-weight: 600; flex-shrink: 0; }
+  .team-name { font-size: 12px; color: #fff; font-weight: 600; }
+  .team-role { font-size: 11px; color: rgba(255,255,255,0.4); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-green { background: #00C853; }
+  .dot-yellow { background: #FFD600; }
+  .dot-gray { background: rgba(255,255,255,0.2); }
+  .team-info { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .team-activity { font-size: 10px; color: rgba(255,255,255,0.3); text-align: right; }
+  .mantra-row { display: flex; align-items: center; gap: 8px; line-height: 2.0; }
+  .mantra-text { font-size: 13px; color: rgba(255,255,255,0.5); font-style: italic; }
+  .grat-date { font-size: 10px; color: rgba(255,255,255,0.3); margin-bottom: 8px; }
+  .grat-input-row { display: flex; gap: 6px; margin-bottom: 8px; }
+  .grat-input { flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 6px 8px; font-size: 12px; color: #fff; outline: none; }
+  .grat-add { background: rgba(0,228,228,0.15); border: none; color: #00E4E4; font-size: 14px; font-weight: 700; width: 28px; border-radius: 4px; cursor: pointer; }
+  .grat-item { font-size: 12px; color: rgba(255,255,255,0.6); padding: 2px 0; }
+  .grat-divider { border-top: 1px solid rgba(255,255,255,0.06); margin: 8px 0; }
+  .grat-yesterday { font-size: 12px; color: rgba(255,255,255,0.2); padding: 2px 0; }
+  .habit-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+  .refl-label { font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 6px; margin-top: 10px; }
+  .refl-label:first-child { margin-top: 0; }
+  .num-row { display: flex; gap: 4px; }
+  .num-circle { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 10px; color: rgba(255,255,255,0.5); cursor: pointer; }
+  .num-circle.selected { background: #00E4E4; color: #0a0a0f; font-weight: 600; }
+  .refl-textarea { width: 100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 8px; font-size: 12px; color: #fff; resize: none; outline: none; font-family: inherit; }
+  .pill-row { display: flex; gap: 4px; }
+  .pill { padding: 5px 12px; border-radius: 12px; background: rgba(255,255,255,0.08); font-size: 11px; color: rgba(255,255,255,0.5); cursor: pointer; border: none; }
+  .pill.selected { background: rgba(0,228,228,0.2); color: #00E4E4; }
+  .save-btn { float: right; margin-top: 12px; background: rgba(0,228,228,0.15); border: none; color: #00E4E4; font-size: 12px; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="stack">
+
+  <!-- 1. 3-5 Year Objectives -->
+  <div class="card">
+    <div class="card-title">3-5 Year Objectives</div>
+    <div class="objectives-text">Build to $X.XM net worth through equity in philosophically-aligned ventures while becoming a recognized voice in the liberty movement, without sacrificing creative output or ownership of my work.</div>
+  </div>
+
+  <!-- 2. Focus Lanes -->
+  <div class="card">
+    <div class="card-title">Focus Lanes</div>
+    <div class="lane-row"><div class="emoji-slot filled">💰</div><span class="lane-label">Wealth</span><span class="lane-desc">&nbsp;— $X.XM through equity in ventures I believe in</span></div>
+    <div class="lane-row"><div class="emoji-slot filled">📢</div><span class="lane-label">Voice</span><span class="lane-desc">&nbsp;— Recognized presence in the liberty movement</span></div>
+    <div class="lane-row"><div class="emoji-slot filled">🎵</div><span class="lane-label">Music</span><span class="lane-desc">&nbsp;— Consistent creative output, 6 tracks/year</span></div>
+  </div>
+
+  <!-- 3. Vital Tasks -->
+  <div class="card">
+    <div class="card-title">Vital Tasks</div>
+    <div class="task-row"><div class="task-cb"></div><span class="task-text">Build memory protection</span><span class="task-project">Pane</span></div>
+    <div class="task-row"><div class="task-cb checked"></div><span class="task-text done">Fix hardcoded password</span><span class="task-project">Pane</span></div>
+    <div class="task-row"><div class="task-cb"></div><span class="task-text">Review Lumen Media articles</span><span class="task-project">Lumen Media</span></div>
+    <div class="task-row"><div class="task-cb"></div><span class="task-text">Record podcast intro</span><span class="task-project">Music</span></div>
+    <div class="add-task">+ Add task</div>
+  </div>
+
+  <!-- 4. Team -->
+  <div class="card">
+    <div class="card-title">Team</div>
+    <div class="team-row"><div class="avatar">B</div><span class="team-info"><span class="team-name">Brit</span><span class="team-role"> — Team Lead</span></span><div class="status-dot dot-green"></div><span class="team-activity">2m ago</span></div>
+    <div class="team-row"><div class="avatar">S</div><span class="team-info"><span class="team-name">Stia</span><span class="team-role"> — Coder</span></span><div class="status-dot dot-green"></div><span class="team-activity">Building...</span></div>
+    <div class="team-row"><div class="avatar">R</div><span class="team-info"><span class="team-name">Reed</span><span class="team-role"> — Researcher</span></span><div class="status-dot dot-yellow"></div><span class="team-activity">1h ago</span></div>
+    <div class="team-row"><div class="avatar">Q</div><span class="team-info"><span class="team-name">Quinn</span><span class="team-role"> — QA</span></span><div class="status-dot dot-gray"></div><span class="team-activity">3h ago</span></div>
+    <div class="team-row"><div class="avatar">L</div><span class="team-info"><span class="team-name">Lane</span><span class="team-role"> — Designer</span></span><div class="status-dot dot-green"></div><span class="team-activity">Active</span></div>
+  </div>
+
+  <!-- 5. Mantras -->
+  <div class="card">
+    <div class="card-title">Mantras</div>
+    <div class="mantra-row"><div class="emoji-slot"></div><span class="mantra-text">"Progress over perfection"</span></div>
+    <div class="mantra-row"><div class="emoji-slot"></div><span class="mantra-text">"Come with solutions, not problems"</span></div>
+    <div class="mantra-row"><div class="emoji-slot"></div><span class="mantra-text">"What matters most?"</span></div>
+    <div class="mantra-row"><div class="emoji-slot"></div><span class="mantra-text">"Find the combination nobody's played"</span></div>
+  </div>
+
+  <!-- 6. Gratitude -->
+  <div class="card">
+    <div class="card-title">Gratitude</div>
+    <div class="grat-date">March 11, 2026</div>
+    <div class="grat-input-row"><input class="grat-input" placeholder="What are you grateful for?"><button class="grat-add">+</button></div>
+    <div class="grat-item">Dana</div>
+    <div class="grat-item">Good health</div>
+    <div class="grat-item">Progress on Pane</div>
+    <div class="grat-divider"></div>
+    <div class="dimmed" style="margin-bottom:4px">Yesterday:</div>
+    <div class="grat-yesterday">Family dinner</div>
+    <div class="grat-yesterday">Sunny weather</div>
+  </div>
+
+  <!-- 7. Habits -->
+  <div class="card">
+    <div class="card-title">Habits</div>
+    <div class="habit-row"><div class="task-cb checked"></div><span class="body">Exercise</span></div>
+    <div class="habit-row"><div class="task-cb checked"></div><span class="body">Hydration</span></div>
+    <div class="habit-row"><div class="task-cb"></div><span class="body">Read 30 min</span></div>
+    <div class="habit-row"><div class="task-cb checked"></div><span class="body">Fitness habit</span></div>
+    <div class="habit-row"><div class="task-cb"></div><span class="body">Creative output</span></div>
+  </div>
+
+  <!-- 8. Reflection -->
+  <div class="card">
+    <div class="card-title">Reflection</div>
+    <div class="refl-label">How well did I optimize my time for my main 3-5 year objective(s)?</div>
+    <div class="num-row">
+      <div class="num-circle">1</div><div class="num-circle">2</div><div class="num-circle">3</div><div class="num-circle">4</div><div class="num-circle">5</div><div class="num-circle">6</div><div class="num-circle selected">7</div><div class="num-circle">8</div><div class="num-circle">9</div><div class="num-circle">10</div>
+    </div>
+    <div class="refl-label">What did I do today to improve on my main objective(s)?</div>
+    <textarea class="refl-textarea" rows="3" placeholder="Today I..."></textarea>
+    <div class="refl-label">What will I do tomorrow to impact my main objective(s)?</div>
+    <textarea class="refl-textarea" rows="3" placeholder="Tomorrow I will..."></textarea>
+    <div class="refl-label">How do I feel today?</div>
+    <div class="pill-row">
+      <button class="pill">Poor</button>
+      <button class="pill">Fair</button>
+      <button class="pill selected">Good</button>
+      <button class="pill">Great</button>
+    </div>
+    <button class="save-btn">Save</button>
+  </div>
+
+</div>
+</body>
+</html>

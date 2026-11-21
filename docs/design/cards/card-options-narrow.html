@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pane Card Options — Narrow (250px, editor open)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    padding: 32px;
+  }
+  h1 { color: #00E4E4; font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  .subtitle { color: #666; font-size: 13px; margin-bottom: 32px; }
+  .options { display: flex; gap: 40px; align-items: flex-start; }
+  .option { flex: 0 0 250px; }
+  .option-label {
+    color: #00E4E4; font-size: 14px; font-weight: 600; letter-spacing: 0.5px;
+    margin-bottom: 6px; text-transform: uppercase;
+  }
+  .option-desc { color: #555; font-size: 11px; margin-bottom: 16px; line-height: 1.4; }
+  .card-list { display: flex; flex-direction: column; gap: 4px; }
+  .card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 5px;
+    padding: 8px 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .card:hover { background: rgba(255,255,255,0.08); }
+  .badge {
+    display: inline-block; font-size: 9px; font-weight: 600;
+    padding: 1px 6px; border-radius: 3px; letter-spacing: 0.3px;
+    text-transform: uppercase; white-space: nowrap; vertical-align: middle;
+  }
+  .badge-todo { background: rgba(0,228,228,0.15); color: #00E4E4; }
+  .badge-inprogress { background: rgba(0,228,228,0.25); color: #00E4E4; }
+  .pill {
+    display: inline-block; font-size: 9px; padding: 1px 5px; border-radius: 3px;
+    white-space: nowrap; vertical-align: middle; background: rgba(255,255,255,0.04); color: #777;
+  }
+  .pill-folder { color: #888; }
+  .pill-date { color: #888; }
+  .pill-priority-urgent { color: #ff4d4d; background: rgba(255,77,77,0.1); }
+  .pill-priority-high { color: #e8a020; background: rgba(232,160,32,0.1); }
+  .pill-subtasks { color: #888; }
+  .title { font-size: 13px; font-weight: 600; color: #e8e8e8; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .empty { visibility: hidden; }
+
+  /* OPTION A: Two-Row Narrow */
+  .a-card { height: 54px; display: flex; flex-direction: column; justify-content: center; }
+  .a-row1 { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
+  .a-row1 .title { flex: 1; min-width: 0; }
+  .a-row2 { display: flex; align-items: center; gap: 4px; height: 16px; }
+  .a-row2 .slot-folder { width: 56px; }
+  .a-row2 .slot-date { width: 62px; }
+  .a-row2 .slot-priority { width: 44px; }
+  .a-row2 .slot-subtasks { width: 52px; }
+
+  /* OPTION B: Three-Row Narrow (no preview — becomes two visible rows) */
+  .b-card { height: 54px; display: flex; flex-direction: column; justify-content: center; }
+  .b-row1 { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .b-row1 .title { flex: 1; min-width: 0; }
+  .b-row2 { display: flex; align-items: center; gap: 4px; height: 16px; }
+  .b-row2 .slot-status { width: 62px; }
+  .b-row2 .slot-folder { width: 56px; }
+  .b-row2 .slot-date { width: 62px; }
+  .b-row2 .slot-priority { width: 44px; }
+
+  /* OPTION C: Stacked Narrow */
+  .c-card { height: 66px; display: flex; flex-direction: column; justify-content: center; }
+  .c-row1 { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
+  .c-row1 .title { flex: 1; min-width: 0; }
+  .c-meta { display: flex; flex-direction: column; gap: 2px; }
+  .c-meta-row { display: flex; align-items: center; gap: 4px; height: 14px; }
+  .c-meta-row .meta-label { font-size: 9px; color: #444; text-transform: uppercase; letter-spacing: 0.3px; width: 36px; }
+  .c-meta-row .meta-value { font-size: 9px; color: #888; }
+  .c-meta-row .meta-value.teal { color: #00E4E4; }
+  .c-meta-row .meta-value.urgent { color: #ff4d4d; }
+  .c-meta-row .meta-value.high { color: #e8a020; }
+
+  .note-box {
+    margin-top: 40px; padding: 16px; border-radius: 6px;
+    background: rgba(0,228,228,0.04); border: 1px solid rgba(0,228,228,0.1);
+    color: #888; font-size: 12px; line-height: 1.6; max-width: 900px;
+  }
+  .note-box strong { color: #00E4E4; }
+  .dropped { color: #ff4d4d; }
+</style>
+</head>
+<body>
+<h1>Card Design Options — Narrow State (250px)</h1>
+<p class="subtitle">Editor open. Same 4 example cards adapted for ~250px width. Metadata is reduced.</p>
+<div class="options">
+
+<!-- OPTION A Narrow -->
+<div class="option">
+  <div class="option-label">Option A — Two-Row</div>
+  <div class="option-desc">Title + status top. Metadata pills below. Drops: preview, assignee.</div>
+  <div class="card-list">
+    <div class="card a-card">
+      <div class="a-row1"><span class="title">Project Planning Document</span><span class="badge badge-todo">todo</span></div>
+      <div class="a-row2">
+        <span class="slot-folder"><span class="pill pill-folder">Cabinet</span></span>
+        <span class="slot-date"><span class="pill pill-date">Apr 02</span></span>
+        <span class="slot-priority"><span class="pill pill-priority-high">high</span></span>
+        <span class="slot-subtasks"><span class="pill pill-subtasks">2 tasks</span></span>
+      </div>
+    </div>
+    <div class="card a-card">
+      <div class="a-row1"><span class="title">Meeting Notes from Tuesday</span><span class="badge empty">todo</span></div>
+      <div class="a-row2">
+        <span class="slot-folder"><span class="pill pill-folder">Cabinet</span></span>
+        <span class="slot-date"><span class="pill empty">Apr 02</span></span>
+        <span class="slot-priority"><span class="pill empty">high</span></span>
+        <span class="slot-subtasks"><span class="pill empty">2 tasks</span></span>
+      </div>
+    </div>
+    <div class="card a-card">
+      <div class="a-row1"><span class="title">Fix Authentication Bug</span><span class="badge badge-inprogress">in progress</span></div>
+      <div class="a-row2">
+        <span class="slot-folder"><span class="pill empty">Cabinet</span></span>
+        <span class="slot-date"><span class="pill pill-date">Apr 02</span></span>
+        <span class="slot-priority"><span class="pill pill-priority-urgent">urgent</span></span>
+        <span class="slot-subtasks"><span class="pill empty">2 tasks</span></span>
+      </div>
+    </div>
+    <div class="card a-card">
+      <div class="a-row1"><span class="title">Untitled Note</span><span class="badge empty">todo</span></div>
+      <div class="a-row2">
+        <span class="slot-folder"><span class="pill empty">Cabinet</span></span>
+        <span class="slot-date"><span class="pill empty">Apr 02</span></span>
+        <span class="slot-priority"><span class="pill empty">high</span></span>
+        <span class="slot-subtasks"><span class="pill empty">2 tasks</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OPTION B Narrow -->
+<div class="option">
+  <div class="option-label">Option B — Compact Strip</div>
+  <div class="option-desc">Title top. Metadata strip below with status leading. Drops: preview, assignee, subtasks.</div>
+  <div class="card-list">
+    <div class="card b-card">
+      <div class="b-row1"><span class="title">Project Planning Document</span></div>
+      <div class="b-row2">
+        <span class="slot-status"><span class="badge badge-todo">todo</span></span>
+        <span class="slot-folder"><span class="pill pill-folder">Cabinet</span></span>
+        <span class="slot-date"><span class="pill pill-date">Apr 02</span></span>
+        <span class="slot-priority"><span class="pill pill-priority-high">high</span></span>
+      </div>
+    </div>
+    <div class="card b-card">
+      <div class="b-row1"><span class="title">Meeting Notes from Tuesday</span></div>
+      <div class="b-row2">
+        <span class="slot-status"><span class="badge empty">todo</span></span>
+        <span class="slot-folder"><span class="pill pill-folder">Cabinet</span></span>
+        <span class="slot-date"><span class="pill empty">Apr 02</span></span>
+        <span class="slot-priority"><span class="pill empty">high</span></span>
+      </div>
+    </div>
+    <div class="card b-card">
+      <div class="b-row1"><span class="title">Fix Authentication Bug</span></div>
+      <div class="b-row2">
+        <span class="slot-status"><span class="badge badge-inprogress">in progress</span></span>
+        <span class="slot-folder"><span class="pill empty">Cabinet</span></span>
+        <span class="slot-date"><span class="pill pill-date">Apr 02</span></span>
+        <span class="slot-priority"><span class="pill pill-priority-urgent">urgent</span></span>
+      </div>
+    </div>
+    <div class="card b-card">
+      <div class="b-row1"><span class="title">Untitled Note</span></div>
+      <div class="b-row2">
+        <span class="slot-status"><span class="badge empty">todo</span></span>
+        <span class="slot-folder"><span class="pill empty">Cabinet</span></span>
+        <span class="slot-date"><span class="pill empty">Apr 02</span></span>
+        <span class="slot-priority"><span class="pill empty">high</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OPTION C Narrow -->
+<div class="option">
+  <div class="option-label">Option C — Labeled Stack</div>
+  <div class="option-desc">Title + status top. Labeled key-value rows below. Drops: preview, assignee. Most readable at small size.</div>
+  <div class="card-list">
+    <div class="card c-card">
+      <div class="c-row1"><span class="title">Project Planning Document</span><span class="badge badge-todo">todo</span></div>
+      <div class="c-meta">
+        <div class="c-meta-row"><span class="meta-label">Folder</span><span class="meta-value">Cabinet</span></div>
+        <div class="c-meta-row"><span class="meta-label">Due</span><span class="meta-value">Apr 02</span><span style="margin-left:8px" class="meta-label">Pri</span><span class="meta-value high">high</span></div>
+      </div>
+    </div>
+    <div class="card c-card">
+      <div class="c-row1"><span class="title">Meeting Notes from Tuesday</span><span class="badge empty">todo</span></div>
+      <div class="c-meta">
+        <div class="c-meta-row"><span class="meta-label">Folder</span><span class="meta-value">Cabinet</span></div>
+        <div class="c-meta-row empty"><span class="meta-label">Due</span><span class="meta-value">-</span><span style="margin-left:8px" class="meta-label">Pri</span><span class="meta-value">-</span></div>
+      </div>
+    </div>
+    <div class="card c-card">
+      <div class="c-row1"><span class="title">Fix Authentication Bug</span><span class="badge badge-inprogress">in progress</span></div>
+      <div class="c-meta">
+        <div class="c-meta-row empty"><span class="meta-label">Folder</span><span class="meta-value">-</span></div>
+        <div class="c-meta-row"><span class="meta-label">Due</span><span class="meta-value">Apr 02</span><span style="margin-left:8px" class="meta-label">Pri</span><span class="meta-value urgent">urgent</span></div>
+      </div>
+    </div>
+    <div class="card c-card">
+      <div class="c-row1"><span class="title">Untitled Note</span><span class="badge empty">todo</span></div>
+      <div class="c-meta">
+        <div class="c-meta-row empty"><span class="meta-label">Folder</span><span class="meta-value">-</span></div>
+        <div class="c-meta-row empty"><span class="meta-label">Due</span><span class="meta-value">-</span><span style="margin-left:8px" class="meta-label">Pri</span><span class="meta-value">-</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="note-box">
+  <strong>Narrow State — Dropped Metadata:</strong><br>
+  - <span class="dropped">Preview text</span>: Dropped in ALL narrow options (not enough width for meaningful preview)<br>
+  - <span class="dropped">Assignee</span>: Dropped in ALL narrow options (visible in editor detail pane instead)<br>
+  - <span class="dropped">Subtasks</span>: Dropped in B and C (kept in A which has more horizontal room)<br>
+  - <strong>Date format</strong>: Shortened from "2026-04-02" to "Apr 02" to prevent wrapping<br>
+  - <strong>Kept in all</strong>: Title, status badge, folder, date, priority — these are the core scannable fields<br><br>
+  <strong>Recommendation:</strong> Option B (Compact Strip) is the sweet spot for narrow — clean, scannable, no wasted space. Option A if subtask visibility matters. Option C if users need labeled clarity at small sizes.
+</div>
+</body>
+</html>

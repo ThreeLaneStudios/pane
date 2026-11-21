@@ -1,0 +1,234 @@
+name: CI — Forbid Hardcoded Constants (G1–G6)
+
+# =============================================================================
+# Hardcoded-constant guard workflow — Phase 1d (#536)
+#
+# Guards (all report-only at land per #1320; downstream issues flip to fail):
+#   G1 — Forbid hardcoded temperature literals in non-test Rust/TS source
+#   G2 — Forbid hardcoded max_tokens literals in streaming-path JSON bodies
+#   G3 — Forbid model ID literals in production Rust outside context_budget.rs
+#   G4 — Forbid model IDs in frontend without // PICKER-SEED: annotation (warn)
+#   G5 — Forbid context-window integer literals outside context_budget.rs (warn)
+#   G6 — Forbid minProtocol/maxProtocol/protocol integer literals in src-gateway/src/
+#   G7 — Forbid window.addEventListener for Tauri-emitted pane events (.svelte)
+#   G8 — Forbid unguarded security-delete-generic-password / rm -rf of a real
+#        ~/Pane path in scripts/ or tests/, unless textually guarded by a
+#        PANE_TEST_ROOT check above it in the same file (#3057 follow-up)
+#
+# Mode flags (change from 'report' to 'fail' in downstream PRs per guard):
+#   G1_MODE: report → fail in #1321 (streaming params fix)
+#   G2_MODE: report → fail in #1321 (streaming params fix)
+#   G3_MODE: report → fail in #1322 (remove hardcoded model defaults)
+#   G4_MODE: report  (remains warn — picker seeds are intentional)
+#   G5_MODE: report → fail in #1324 (context window: gateway emits contextWindow)
+#   G6_MODE: fail    (landed at fail mode — #1336 removes the only existing violation)
+#   G7_MODE: fail    (landed at fail mode — #2215 removes the only existing violation)
+#   G8_MODE: fail    (landed at fail mode — #3050 PR 7 fixes the only existing
+#            violation, smoke-launch.sh, in the same PR; no report-only window needed)
+#
+# Spec: docs/dev-hygiene-playbook.md — Appendix E: CI Guard Catalog (G1–G6)
+# Audit: ~/Shared/ExampleApp/docs/audits/2026-05-31-hardcoded-models-audit.md §7
+# Audit: ~/Shared/ExampleApp/docs/audits/2026-05-31-1336-protocol-durability-audit.md §8
+# Audit: ~/Shared/ExampleApp/docs/audits/2026-10-29-scope-3050-pr7-background-pickup.md §1(b)
+# Related: #1320 (G1–G5), #1336 (G6), #1321, #1322, #1324, #536, #3050, #3057
+# =============================================================================
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+# Per-guard mode flags.
+# DEFAULT: all 'report' — guards log violations but NEVER fail the build.
+# Downstream PRs (#1321, #1322, #1324) flip their guard(s) to 'fail'.
+env:
+  G1_MODE: fail    # flipped by #1321 — streaming-params 12-site cleanup
+  G2_MODE: fail    # flipped by #1321 — streaming-params 12-site cleanup
+  G3_MODE: fail    # flipped by #1322 — remove-hardcoded-defaults-source-from-agents
+  G4_MODE: report  # permanent
+  G5_MODE: report  # flipped by #1324
+  G6_MODE: fail    # landed at fail — #1336 removes the only existing violations; no report-only window needed
+  G7_MODE: fail    # landed at fail — #2215 removes the only existing violation; catches DOM listener for Tauri-emitted events
+  G8_MODE: fail    # landed at fail — #3050 PR 7 fixes the only existing violation (smoke-launch.sh) in the same PR
+
+jobs:
+  forbid-hardcoded-constants:
+    name: Forbid Hardcoded Constants (G1–G5)
+    runs-on: ubuntu-latest
+
+    steps:
+      # ──────────────────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ──────────────────────────────────────────────────────────────────────
+      - name: Install ripgrep
+        run: |
+          if ! command -v rg &>/dev/null; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq ripgrep
+          fi
+          rg --version
+
+      # ──────────────────────────────────────────────────────────────────────
+      # Self-check: run unit tests against fixtures before running guards on
+      # the real codebase. If guard logic is broken, fail here, not silently.
+      # ──────────────────────────────────────────────────────────────────────
+      - name: Self-check — guard unit tests (fixtures)
+        run: |
+          echo "Running CI guard unit tests against fixture files..."
+          bash scripts/ci-guards/tests/run-tests.sh
+        env:
+          REPO_ROOT: ${{ github.workspace }}
+
+      # ──────────────────────────────────────────────────────────────────────
+      - name: "G1: Forbid hardcoded temperature literals (non-test Rust/TS)"
+        run: |
+          echo "G1_MODE=${G1_MODE}"
+          REPO_ROOT="${GITHUB_WORKSPACE}" bash scripts/ci-guards/run-guards.sh g1
+        env:
+          REPO_ROOT: ${{ github.workspace }}
+          G1_MODE: ${{ env.G1_MODE }}
+
+      # ──────────────────────────────────────────────────────────────────────
+      - name: "G2: Forbid hardcoded max_tokens literals in streaming paths"
+        run: |
+          echo "G2_MODE=${G2_MODE}"
+          REPO_ROOT="${GITHUB_WORKSPACE}" bash scripts/ci-guards/run-guards.sh g2
+        env:
+          REPO_ROOT: ${{ github.workspace }}
+          G2_MODE: ${{ env.G2_MODE }}
+
+      # ──────────────────────────────────────────────────────────────────────
+      - name: "G3: Forbid model ID literals in production Rust (not context_budget.rs)"
+        run: |
+          echo "G3_MODE=${G3_MODE}"
+          REPO_ROOT="${GITHUB_WORKSPACE}" bash scripts/ci-guards/run-guards.sh g3
+        env:
+          REPO_ROOT: ${{ github.workspace }}
+          G3_MODE: ${{ env.G3_MODE }}
+
+      # ──────────────────────────────────────────────────────────────────────
+      - name: "G4: Forbid unannotated model IDs in frontend (warn — PICKER-SEED required)"
+        run: |
+          echo "G4_MODE=${G4_MODE}"
+          REPO_ROOT="${GITHUB_WORKSPACE}" bash scripts/ci-guards/run-guards.sh g4
+        env:
+          REPO_ROOT: ${{ github.workspace }}
+          G4_MODE: ${{ env.G4_MODE }}
+
+      # ──────────────────────────────────────────────────────────────────────
+      - name: "G5: Forbid context-window integer literals outside context_budget.rs (warn)"
+        run: |
+          echo "G5_MODE=${G5_MODE}"
+          REPO_ROOT="${GITHUB_WORKSPACE}" bash scripts/ci-guards/run-guards.sh g5
+        env:
+          REPO_ROOT: ${{ github.workspace }}
+          G5_MODE: ${{ env.G5_MODE }}
+
+      # ──────────────────────────────────────────────────────────────────────
+      - name: "G6: Forbid minProtocol/maxProtocol/protocol integer literals in src-gateway/src/"
+        run: |
+          echo "G6_MODE=${G6_MODE}"
+          REPO_ROOT="${GITHUB_WORKSPACE}" bash scripts/ci-guards/run-guards.sh g6
+        env:
+          REPO_ROOT: ${{ github.workspace }}
+          G6_MODE: ${{ env.G6_MODE }}
+
+      # ──────────────────────────────────────────────────────────────────────
+      - name: "G7: Forbid window.addEventListener for Tauri-emitted pane events (.svelte)"
+        run: |
+          echo "G7_MODE=${G7_MODE}"
+          REPO_ROOT="${GITHUB_WORKSPACE}" bash scripts/ci-guards/run-guards.sh g7
+        env:
+          REPO_ROOT: ${{ github.workspace }}
+          G7_MODE: ${{ env.G7_MODE }}
+
+      # ──────────────────────────────────────────────────────────────────────
+      - name: "G8: Forbid unguarded Keychain-delete / rm-rf-~/Pane in scripts/ or tests/"
+        run: |
+          echo "G8_MODE=${G8_MODE}"
+          REPO_ROOT="${GITHUB_WORKSPACE}" bash scripts/ci-guards/run-guards.sh g8
+        env:
+          REPO_ROOT: ${{ github.workspace }}
+          G8_MODE: ${{ env.G8_MODE }}
+
+      # ──────────────────────────────────────────────────────────────────────
+      # Generate structured violation report artifact.
+      # Machine-readable JSON for future tooling; does not affect pass/fail.
+      # ──────────────────────────────────────────────────────────────────────
+      - name: Generate guard report artifact
+        if: always()
+        run: |
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          REPORT_FILE="guard-report.json"
+
+          collect_guard() {
+            local guard_id="$1"
+            local mode_var="G${guard_id#G}_MODE"
+            local mode="${!mode_var:-report}"
+            local violations=()
+
+            case "$guard_id" in
+              G1)
+                while IFS= read -r line; do
+                  [[ -z "$line" ]] && continue
+                  violations+=("$(echo "$line" | jq -Rc '{file_line: (split(":")[0:2] | join(":")), content: (split(":")[2:] | join(":") | ltrimstr(" ")), guard: "G1", mode: "'"$mode"'"}')")
+                done < <(rg --no-heading -n --type rust \
+                  -e '"temperature"\s*:\s*[0-9]' -e 'temperature:\s*[0-9]' \
+                  --glob '!*_tests.rs' --glob '!*tests*.rs' --glob '!*test*.rs' --glob '!target/**' \
+                  src-tauri/src/ 2>/dev/null || true)
+                ;;
+              G2)
+                while IFS= read -r line; do
+                  [[ -z "$line" ]] && continue
+                  violations+=("$(echo "$line" | jq -Rc '{file_line: (split(":")[0:2] | join(":")), content: (split(":")[2:] | join(":") | ltrimstr(" ")), guard: "G2", mode: "'"$mode"'"}')")
+                done < <(rg --no-heading -n --type rust \
+                  '"max_tokens"\s*:\s*[0-9]+' \
+                  --glob '!*_tests.rs' --glob '!*tests*.rs' --glob '!*test*.rs' --glob '!target/**' \
+                  src-tauri/src/ai/ 2>/dev/null || true)
+                ;;
+            esac
+
+            printf '%s\n' "${violations[@]}"
+          }
+
+          # Simplified report: run all guards, capture output
+          {
+            echo '{'
+            echo "  \"timestamp\": \"${TIMESTAMP}\","
+            echo "  \"commit\": \"${GITHUB_SHA:-unknown}\","
+            echo "  \"ref\": \"${GITHUB_REF:-unknown}\","
+            echo "  \"modes\": {"
+            echo "    \"G1\": \"${G1_MODE}\","
+            echo "    \"G2\": \"${G2_MODE}\","
+            echo "    \"G3\": \"${G3_MODE}\","
+            echo "    \"G4\": \"${G4_MODE}\","
+            echo "    \"G5\": \"${G5_MODE}\","
+            echo "    \"G6\": \"${G6_MODE}\""
+            echo "  },"
+            echo "  \"audit_ref\": \"docs/dev-hygiene-playbook.md#appendix-e-ci-guard-catalog-g1g5\","
+            echo "  \"spec_issue\": \"#1320\","
+            echo "  \"note\": \"See individual guard steps in CI log for full violation details\""
+            echo '}'
+          } > "${REPORT_FILE}"
+
+          echo "Guard report written to ${REPORT_FILE}"
+          cat "${REPORT_FILE}"
+        env:
+          G1_MODE: ${{ env.G1_MODE }}
+          G2_MODE: ${{ env.G2_MODE }}
+          G3_MODE: ${{ env.G3_MODE }}
+          G4_MODE: ${{ env.G4_MODE }}
+          G5_MODE: ${{ env.G5_MODE }}
+          G6_MODE: ${{ env.G6_MODE }}
+
+      - name: Upload guard report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: guard-report
+          path: guard-report.json
+          retention-days: 30

@@ -1,0 +1,415 @@
+/* =========================================================
+   Pane — Sheets: structured-table note type
+   Consumes colors_and_type.css tokens only. No new colors, no new fonts.
+
+   Locked decisions (from brief)
+   - Cells keep their set sizes. The grid overflows both axes; column
+     headers stick to the top, row numbers stick to the left.
+   - Ghost columns and rows are always present past the last real one.
+     Typing into a ghost commits it; a new ghost appears beyond.
+   - Sort and filter are VIEW-ONLY. Every sorted/filtered state carries a
+     removable chip that says so.
+
+   Design calls made here (see README for the flag list)
+   - CORNER MARKER LANGUAGE. Position = category, color = meaning.
+       bottom-left cyan wedge  → computed (formula result)
+       bottom-left red wedge   → formula error
+       top-right amber wedge   → type mismatch (value stored as text)
+     Nothing else in a cell ever uses a corner wedge.
+   - Selection is a 1.5px inset cyan ring on the anchor; a range fills with
+     accent-soft and outlines the block, anchor keeps its ring.
+   - Type is expressed as a monospace glyph in the header, never as a word.
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   App context. The board beneath the overlay is the UI kit's
+   KanbanBoard markup and kit.css classes (.kanban/.kcol/.kcard/
+   .dot/.pill/.iconbtn); the toolbar is the kit's .etool row
+   (.ebtn/.esep). Only the collapsed sidebar rail and the overlay
+   shell are authored here, because the kit has no collapsed state.
+   --------------------------------------------------------- */
+.sh-app{position:relative;width:100%;height:100%;background:var(--bg);overflow:hidden;display:flex;font-family:var(--font-sans)}
+.sh-rail{width:48px;flex-shrink:0;border-right:1px solid var(--border-faint);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:16px;background:var(--bg)}
+.sh-rail__ico{width:26px;height:26px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:var(--fg-4)}
+.sh-rail__ico.is-on{color:var(--fg-1)}
+.sh-rail__dots{margin-top:6px;display:flex;flex-direction:column;gap:14px;align-items:center}
+.sh-rail__dot{width:6px;height:6px;border-radius:50%}
+.sh-rail__sp{flex:1}
+.sh-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.sh-top{height:60px;flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 22px;border-bottom:1px solid var(--border-faint)}
+.sh-top__back{color:var(--fg-3);display:flex}
+.sh-top__title{font-size:20px;font-weight:600;color:var(--fg-1);letter-spacing:-0.01em}
+.sh-top__sp{flex:1}
+.sh-newnote{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:var(--fg-on-accent);font-size:13.5px;font-weight:600;padding:9px 15px;border-radius:var(--radius-md)}
+.sh-boardwrap{flex:1;min-height:0;overflow:hidden}
+.sh-kanban{grid-template-columns:repeat(4,220px);padding:16px 0 0 16px;gap:14px;align-items:flex-start}
+
+/* ---------------------------------------------------------
+   The overlay — same position/behaviour as the note editor
+   --------------------------------------------------------- */
+.sh-overlay{position:absolute;top:60px;right:0;bottom:0;background:var(--bg);border-left:1px solid var(--border);display:flex;flex-direction:column;box-shadow:-24px 0 48px rgba(0,0,0,0.45);z-index:4}
+.sh-ohead{display:flex;align-items:center;gap:10px;padding:18px 22px 14px;flex-shrink:0}
+.sh-ohead__title{font-size:22px;font-weight:600;color:var(--fg-1);letter-spacing:-0.015em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sh-chip{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;padding:5px 11px;border-radius:var(--radius-pill);font-size:12.5px;font-weight:500;border:1px solid var(--border);color:var(--fg-2);background:transparent;white-space:nowrap}
+.sh-chip svg{color:var(--fg-3)}
+.sh-chip--accent{color:var(--accent);border-color:rgba(0,228,228,0.35)}
+.sh-chip--date{color:var(--status-gold);border-color:rgba(245,184,36,0.35)}
+
+/* ---------------------------------------------------------
+   Sheet toolbar — the note editor's toolbar row, sheet verbs
+   Order: structure | style | formula | view | overflow
+   --------------------------------------------------------- */
+.sh-tb{display:flex;align-items:center;gap:4px;padding:6px 12px;border-top:1px solid var(--border-faint);border-bottom:1px solid var(--border-faint);flex-shrink:0}
+.sh-tb .ebtn{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+/* the icon-only New Sheet must keep the labelled buttons' box height */
+.btn--outline,.btn--primary{min-height:32px}
+.sh-tb__fill{gap:5px}
+.sh-tb__sp{flex:1}
+.sh-tb__swatch{width:13px;height:13px;border-radius:3px;border:1px solid var(--border-strong);flex-shrink:0}
+
+/* ---------------------------------------------------------
+   Formula bar — Excel-style, above the grid
+   --------------------------------------------------------- */
+.sh-fbar{display:flex;align-items:stretch;gap:0;border-bottom:1px solid var(--border-faint);flex-shrink:0;background:var(--bg)}
+.sh-fbar__ref{width:72px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12.5px;font-weight:500;color:var(--fg-1);border-right:1px solid var(--border-faint);font-variant-numeric:tabular-nums}
+.sh-fbar__fx{width:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12px;font-style:italic;color:var(--fg-4);border-right:1px solid var(--border-faint)}
+.sh-fbar__in{flex:1;min-width:0;display:flex;align-items:center;padding:9px 12px;font-family:var(--font-mono);font-size:12.5px;color:var(--fg-2);line-height:1.5;overflow:hidden;white-space:nowrap}
+.sh-fbar.is-editing{background:var(--surface-1)}
+.sh-fbar.is-editing .sh-fbar__in{box-shadow:inset 0 0 0 1px var(--accent);color:var(--fg-1)}
+.sh-fbar__empty{color:var(--fg-4);font-family:var(--font-sans);font-size:12.5px}
+.sh-fbar__x{width:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--fg-4);border-left:1px solid var(--border-faint)}
+/* formula token colors — one system, used in the bar and in-cell alike */
+.sh-t-fn{color:var(--fg-1);font-weight:500}
+.sh-t-ref{color:var(--accent)}
+.sh-t-num{color:var(--fg-2)}
+.sh-t-op{color:var(--fg-3)}
+.sh-t-str{color:var(--status-success)}
+.sh-caret{display:inline-block;width:1px;height:14px;background:var(--accent);vertical-align:-2px;margin:0 -0.5px}
+
+/* ---------------------------------------------------------
+   View strip — present ONLY when a sort or filter is applied.
+   Its whole job is to say "this is a view, not your data".
+   --------------------------------------------------------- */
+.sh-view{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--surface-1);border-bottom:1px solid var(--border-faint);flex-shrink:0}
+.sh-vchip{display:inline-flex;align-items:center;gap:6px;padding:3px 4px 3px 9px;border-radius:var(--radius-pill);background:var(--surface-2);border:1px solid var(--border);font-size:12px;color:var(--fg-1);white-space:nowrap}
+.sh-vchip svg{color:var(--accent);flex-shrink:0}
+.sh-vchip b{font-weight:500}
+.sh-vchip__x{width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--fg-4);background:transparent}
+.sh-vchip__x:hover{background:var(--overlay-press);color:var(--fg-1)}
+.sh-view__note{font-size:11.5px;color:var(--fg-4);margin-left:2px}
+
+/* ---------------------------------------------------------
+   Paused-computation notice — quiet, not alarming
+   --------------------------------------------------------- */
+.sh-paused{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--surface-1);border-bottom:1px solid var(--border-faint);flex-shrink:0}
+.sh-paused svg{color:var(--fg-3);flex-shrink:0}
+.sh-paused__t{font-size:12.5px;color:var(--fg-2)}
+.sh-paused__t b{color:var(--fg-1);font-weight:500;font-variant-numeric:tabular-nums}
+.sh-paused__sub{font-size:12.5px;color:var(--fg-4)}
+.sh-paused__sp{flex:1}
+.sh-paused__b{padding:5px 11px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--fg-1);font-family:var(--font-sans);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap}
+.sh-paused__b:hover{background:var(--surface-2);border-color:var(--border-strong)}
+
+/* =========================================================
+   THE GRID
+   ========================================================= */
+.sh-gridwrap{flex:1;min-height:0;overflow:auto;position:relative;background:var(--bg)}
+.sh-grid{display:grid;width:max-content;font-size:13px;position:relative}
+/* every cell carries its own right+bottom hairline; the sticky bands
+   overpaint theirs so scrolled content never bleeds through */
+.sh-c{border-right:1px solid var(--border-faint);border-bottom:1px solid var(--border-faint);padding:0 9px;display:flex;align-items:center;min-width:0;position:relative;color:var(--fg-1);background:var(--bg);box-sizing:border-box}
+.sh-c__v{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+
+/* column header band */
+.sh-h{position:sticky;top:0;z-index:3;background:var(--surface-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px;padding:0 8px;box-sizing:border-box;cursor:pointer;transition:background var(--dur-fast) var(--ease)}
+.sh-h:hover{background:var(--surface-2)}
+.sh-h.is-open{background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--accent)}
+.sh-h__ref{font-family:var(--font-mono);font-size:10px;color:var(--fg-4);flex-shrink:0;letter-spacing:0.02em}
+.sh-h__type{width:15px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--fg-3)}
+.sh-h__name{flex:1;min-width:0;font-size:12.5px;font-weight:600;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sh-h__code{font-family:var(--font-mono);font-size:9.5px;color:var(--fg-4);flex-shrink:0;letter-spacing:0.04em}
+.sh-h__flag{flex-shrink:0;display:flex;color:var(--accent)}
+.sh-h.is-sel{background:var(--accent-soft)}
+.sh-h.is-sel .sh-h__name{color:var(--accent)}
+/* column resize hit zone — 6px straddling the header's right edge */
+.sh-h__grip{position:absolute;top:0;right:-3px;width:6px;height:100%;cursor:col-resize;z-index:4}
+.sh-h__grip:hover::after,.sh-h__grip.is-forced::after{content:'';position:absolute;top:0;right:2px;width:2px;height:100%;background:var(--accent)}
+
+/* corner + row-number gutter */
+.sh-corner{position:sticky;top:0;left:0;z-index:5;background:var(--surface-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border);box-sizing:border-box;display:flex;align-items:center;justify-content:center;color:var(--fg-4)}
+.sh-g{position:sticky;left:0;z-index:2;background:var(--surface-1);border-right:1px solid var(--border);border-bottom:1px solid var(--border-faint);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10.5px;color:var(--fg-4);font-variant-numeric:tabular-nums;cursor:pointer}
+.sh-g:hover{background:var(--surface-2);color:var(--fg-2)}
+.sh-g.is-sel{background:var(--accent-soft);color:var(--accent)}
+/* row resize hit zone — bottom edge of the gutter cell only, so it can
+   never be confused with a cell-content drag */
+.sh-g__grip{position:absolute;left:0;bottom:-3px;width:100%;height:6px;cursor:row-resize;z-index:4}
+.sh-g__grip:hover::after,.sh-g__grip.is-forced::after{content:'';position:absolute;left:0;bottom:2px;height:2px;width:100%;background:var(--accent)}
+
+/* live resize guide + readout */
+.sh-guide{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);z-index:8;pointer-events:none}
+.sh-guide--row{left:0;right:0;top:auto;bottom:auto;width:auto;height:2px}
+.sh-readout{position:absolute;z-index:9;background:var(--surface-3);border:1px solid var(--border-strong);border-radius:var(--radius-sm);padding:3px 8px;font-family:var(--font-mono);font-size:11px;color:var(--fg-1);box-shadow:var(--shadow-pop);pointer-events:none;font-variant-numeric:tabular-nums}
+
+/* ---------- cell content by column type ---------- */
+.sh-c--num,.sh-c--currency{justify-content:flex-end;font-variant-numeric:tabular-nums}
+.sh-c--date{font-variant-numeric:tabular-nums;color:var(--fg-2)}
+.sh-c--check{justify-content:center}
+.sh-box{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--fg-4);display:flex;align-items:center;justify-content:center;color:transparent}
+.sh-box.is-on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.sh-pill{display:inline-flex;align-items:center;max-width:100%;padding:2px 8px;border-radius:var(--radius-sm);background:var(--surface-2);border:1px solid var(--border);font-size:11.5px;font-weight:500;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sh-cur{color:var(--fg-4);font-family:var(--font-mono);font-size:9.5px;margin-left:5px;letter-spacing:0.04em}
+
+/* ---------- corner marker language ---------- */
+.sh-w{position:absolute;width:0;height:0;pointer-events:none}
+.sh-w--calc{left:0;bottom:0;border-left:5px solid var(--accent);border-top:5px solid transparent}
+.sh-w--err{left:0;bottom:0;border-left:5px solid var(--status-danger);border-top:5px solid transparent}
+.sh-w--mis{right:0;top:0;border-right:5px solid var(--status-warning);border-bottom:5px solid transparent}
+
+.sh-c--calc{background:rgba(0,228,228,0.035)}
+.sh-c--err{background:rgba(239,68,68,0.09);color:var(--status-danger);font-family:var(--font-mono);font-size:11.5px;font-weight:500}
+.sh-c--mis .sh-c__v{color:var(--fg-2);text-decoration:underline;text-decoration-style:dotted;text-decoration-color:var(--status-warning);text-underline-offset:3px}
+.sh-c--mis{justify-content:flex-start}
+.sh-c--raw{font-family:var(--font-mono);font-size:11.5px;color:var(--fg-3)}
+
+/* ---------- selection ---------- */
+.sh-c.is-anchor{z-index:1;box-shadow:inset 0 0 0 1.5px var(--accent)}
+.sh-c.is-range{background:var(--accent-soft)}
+.sh-c.is-range.sh-c--calc{background:rgba(0,228,228,0.18)}
+.sh-c.is-redge-t{border-top:1.5px solid var(--accent);margin-top:-1px}
+.sh-c.is-redge-b{border-bottom:1.5px solid var(--accent)}
+.sh-c.is-redge-l{border-left:1.5px solid var(--accent);margin-left:-1px}
+.sh-c.is-redge-r{border-right:1.5px solid var(--accent)}
+/* a range referenced by the formula being edited — dashed, never solid,
+   so it can't be mistaken for the selection */
+.sh-c.is-ref{background:rgba(0,228,228,0.07)}
+.sh-c.is-refedge-t{border-top:1.5px dashed var(--accent)}
+.sh-c.is-refedge-b{border-bottom:1.5px dashed var(--accent)}
+.sh-c.is-refedge-l{border-left:1.5px dashed var(--accent)}
+.sh-c.is-refedge-r{border-right:1.5px dashed var(--accent)}
+
+/* ---------- ghost space ---------- */
+.sh-h--ghost{background:transparent;border-right-color:var(--border-faint);border-bottom-color:var(--border-faint)}
+.sh-h--ghost .sh-h__ref{color:var(--fg-4);opacity:0.55}
+.sh-h--ghost:hover{background:var(--overlay-hover)}
+.sh-c--ghost{background:transparent;border-right-color:rgba(240,237,232,0.035);border-bottom-color:rgba(240,237,232,0.035)}
+.sh-c--ghost:hover{background:var(--overlay-hover)}
+.sh-g--ghost{background:transparent;border-bottom-color:rgba(240,237,232,0.035);color:var(--fg-4);opacity:0.55}
+/* the ghost cell being typed into — commits on the first keystroke */
+.sh-c--ghost.is-typing{background:var(--surface-1);box-shadow:inset 0 0 0 1.5px var(--accent);color:var(--fg-1)}
+
+/* ---------- in-cell editors ---------- */
+.sh-ed{position:absolute;left:-1px;top:-1px;z-index:20;background:var(--surface-1);box-shadow:inset 0 0 0 1.5px var(--accent),var(--shadow-pop);border-radius:2px;display:flex;align-items:center;padding:0 8px;box-sizing:border-box;color:var(--fg-1);font-size:13px;min-height:calc(100% + 2px)}
+.sh-ed--num{justify-content:flex-end;font-variant-numeric:tabular-nums}
+.sh-ed--mono{font-family:var(--font-mono);font-size:12px}
+.sh-ed__hint{position:absolute;left:0;top:100%;margin-top:4px;white-space:nowrap;font-size:11px;color:var(--fg-4);background:var(--surface-3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 7px}
+
+/* dropdown / date / detail popovers */
+.sh-pop{position:absolute;z-index:30;background:#1c1c20;border:1px solid var(--border-strong);border-radius:10px;box-shadow:var(--shadow-pop);padding:5px;min-width:168px;box-sizing:border-box}
+.sh-pop__lab{font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--fg-4);padding:7px 9px 5px}
+.sh-pop__i{display:flex;align-items:center;gap:9px;width:100%;padding:7px 9px;border:0;background:transparent;border-radius:var(--radius-sm);color:var(--fg-2);font-family:var(--font-sans);font-size:13px;text-align:left;cursor:pointer}
+.sh-pop__i:hover{background:var(--overlay-hover);color:var(--fg-1)}
+.sh-pop__i.is-on{color:var(--fg-1)}
+.sh-pop__i.is-on .sh-pop__tick{opacity:1}
+.sh-pop__tick{margin-left:auto;color:var(--accent);opacity:0;flex-shrink:0}
+.sh-pop__ico{width:16px;flex-shrink:0;display:flex;justify-content:center;color:var(--fg-3)}
+.sh-pop__i:hover .sh-pop__ico{color:var(--fg-2)}
+.sh-pop__kb{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--fg-4)}
+.sh-pop__hr{height:1px;background:var(--border-faint);margin:5px 3px}
+.sh-pop__danger{color:var(--status-danger)}
+.sh-pop__danger .sh-pop__ico{color:var(--status-danger)}
+.sh-pop__danger:hover{background:rgba(239,68,68,0.10);color:var(--status-danger)}
+.sh-pop__in{width:100%;box-sizing:border-box;background:var(--surface-2);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:7px 9px;color:var(--fg-1);font-family:var(--font-sans);font-size:13px;margin:2px 0 4px}
+.sh-pop__sub{font-size:11.5px;color:var(--fg-4);padding:2px 9px 7px;line-height:1.45}
+
+/* error detail — shown when an error cell is selected */
+.sh-errpop{position:absolute;z-index:30;width:252px;background:#1c1c20;border:1px solid rgba(239,68,68,0.4);border-radius:10px;box-shadow:var(--shadow-pop);padding:11px 12px;box-sizing:border-box}
+.sh-errpop__code{font-family:var(--font-mono);font-size:12px;font-weight:500;color:var(--status-danger);margin-bottom:5px}
+.sh-errpop__msg{font-size:12.5px;color:var(--fg-2);line-height:1.45}
+.sh-errpop__f{margin-top:9px;padding-top:9px;border-top:1px solid var(--border-faint);font-family:var(--font-mono);font-size:11.5px;color:var(--fg-3);word-break:break-all}
+
+/* =========================================================
+   Cell styling — palette panel + context menu
+   ========================================================= */
+.sh-sty{width:268px;box-sizing:border-box;background:#1c1c20;border:1px solid var(--border-strong);border-radius:10px;box-shadow:var(--shadow-pop);padding:12px}
+.sh-sty__sec+.sh-sty__sec{margin-top:14px;padding-top:13px;border-top:1px solid var(--border-faint)}
+.sh-sty__lab{font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--fg-4);margin-bottom:8px}
+.sh-sw{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.sh-sw__b{aspect-ratio:1;border-radius:5px;border:1px solid var(--border);cursor:pointer;padding:0;position:relative}
+.sh-sw__b:hover{border-color:var(--border-strong)}
+.sh-sw__b.is-on{box-shadow:0 0 0 1.5px var(--accent);border-color:transparent}
+.sh-sw__b--none{background:transparent;display:flex;align-items:center;justify-content:center;color:var(--fg-4)}
+.sh-sw__b--txt{display:flex;align-items:center;justify-content:center;font-family:var(--font-sans);font-size:12px;font-weight:700;background:var(--surface-2)}
+.sh-seg{display:flex;gap:4px}
+.sh-seg__b{flex:1 1 0;min-width:0;height:28px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--fg-3);font-family:var(--font-sans);font-size:11.5px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.sh-seg__b:hover{background:var(--overlay-hover);color:var(--fg-1)}
+.sh-seg__b.is-on{background:var(--accent-soft);border-color:rgba(0,228,228,0.4);color:var(--accent)}
+.sh-sty__clear{width:100%;margin-top:12px;height:30px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--fg-2);font-family:var(--font-sans);font-size:12.5px;font-weight:500;cursor:pointer}
+.sh-sty__clear:hover{background:var(--overlay-hover);color:var(--fg-1);border-color:var(--border-strong)}
+.sh-sty__row{display:flex;align-items:center;gap:8px}
+.sh-sty__row .sh-sty__lab{margin:0;flex:1}
+
+/* =========================================================
+   Board card face — a sheet on Kanban / project / folder / All Tasks
+   Built ON the kit's .kcard (its own padding, radius, rail and hover);
+   only the sheet-specific parts live here.
+   ========================================================= */
+.sh-card__glyph{width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+/* micro-summary grid — schematic, never a text preview */
+.sh-mini{border:1px solid var(--border-faint);border-radius:5px;overflow:hidden}
+.sh-mini__h{display:grid;background:var(--surface-2);border-bottom:1px solid var(--border-faint)}
+.sh-mini__hc{height:16px;display:flex;align-items:center;justify-content:center;color:var(--fg-4);border-right:1px solid var(--border-faint)}
+.sh-mini__hc:last-child{border-right:0}
+.sh-mini__r{display:grid;border-bottom:1px solid var(--border-faint)}
+.sh-mini__r:last-child{border-bottom:0}
+.sh-mini__c{height:15px;display:flex;align-items:center;padding:0 5px;border-right:1px solid var(--border-faint)}
+.sh-mini__c:last-child{border-right:0}
+.sh-mini__bar{height:4px;border-radius:2px;background:var(--surface-3)}
+.sh-mini__bar--calc{background:rgba(0,228,228,0.35)}
+.sh-mini__box{width:7px;height:7px;border-radius:2px;border:1px solid var(--fg-4);margin:0 auto}
+/* status line + the due-date tone the kit's .pill set doesn't carry */
+.sh-card__status{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--fg-3)}
+.sh-due{background:rgba(245,184,36,0.14);color:var(--status-gold);border-color:rgba(245,184,36,0.28);font-variant-numeric:tabular-nums}
+/* micro-summary footer. The metric must never wrap — the crumb is the only
+   element allowed to ellipsize. */
+.sh-card__foot{display:flex;align-items:center;gap:8px;padding-top:9px;border-top:1px solid var(--border-faint);font-size:11px;color:var(--fg-4);min-width:0}
+.sh-card__foot b,.sh-card__foot span.sh-card__calc{white-space:nowrap;flex-shrink:0}
+.sh-card__foot b{font-family:var(--font-mono);font-size:10.5px;color:var(--fg-3);font-weight:400;font-variant-numeric:tabular-nums}
+.sh-card__crumb{margin-left:auto;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* =========================================================
+   Version history — existing shell, sheet-native right pane
+   ========================================================= */
+.sh-vh{width:100%;height:100%;box-sizing:border-box;background:#141417;border:1px solid var(--border-strong);border-radius:var(--radius-lg);display:flex;flex-direction:column;overflow:hidden}
+.sh-vh__top{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid var(--border-faint);flex-shrink:0}
+.sh-vh__title{font-size:15px;font-weight:600;color:var(--fg-1)}
+.sh-vh__x{margin-left:auto;color:var(--fg-4);display:flex}
+.sh-vh__body{flex:1;min-height:0;display:flex}
+.sh-vh__list{width:246px;flex-shrink:0;border-right:1px solid var(--border-faint);overflow:auto;padding:7px}
+.sh-snap{display:block;width:100%;text-align:left;padding:10px 11px;border-radius:var(--radius-md);border:0;background:transparent;cursor:pointer;margin-bottom:2px}
+.sh-snap:hover{background:var(--overlay-hover)}
+.sh-snap.is-on{background:var(--surface-2)}
+.sh-snap__t{font-size:12.5px;font-weight:500;color:var(--fg-1);font-variant-numeric:tabular-nums;margin-bottom:5px}
+.sh-snap.is-on .sh-snap__t{color:var(--fg-1)}
+/* source label — the sheet variants read distinctly from a manual note edit */
+.sh-src{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:500;letter-spacing:0.02em;padding:2px 7px;border-radius:4px;background:var(--surface-2);color:var(--fg-3);max-width:100%}
+.sh-src svg{flex-shrink:0}
+.sh-src--sheet{background:var(--accent-soft);color:var(--accent)}
+.sh-src--agent{background:rgba(139,92,246,0.14);color:#a78bfa}
+.sh-src--restore{background:rgba(245,158,11,0.14);color:var(--status-warning)}
+.sh-src__n{font-family:var(--font-mono);font-size:10px;opacity:0.8}
+.sh-vh__pane{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
+.sh-vh__phead{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border-faint);flex-shrink:0}
+.sh-vh__pt{font-size:12.5px;color:var(--fg-2);font-variant-numeric:tabular-nums}
+.sh-vh__pt b{color:var(--fg-1);font-weight:600}
+.sh-vh__pmeta{font-size:11.5px;color:var(--fg-4);font-variant-numeric:tabular-nums}
+.sh-vh__sp{flex:1}
+.sh-restore{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:var(--fg-on-accent);border:0;border-radius:var(--radius-md);padding:8px 14px;font-family:var(--font-sans);font-size:12.5px;font-weight:600;cursor:pointer}
+.sh-restore:hover{background:var(--accent-hover)}
+.sh-vh__undo{font-size:11px;color:var(--fg-4);white-space:nowrap}
+/* read-only mini-grid: no ghost space, no selection, everything recedes */
+.sh-ro .sh-h{cursor:default;background:var(--surface-1)}
+.sh-ro .sh-h:hover{background:var(--surface-1)}
+.sh-ro .sh-g{cursor:default}
+.sh-ro .sh-g:hover{background:var(--surface-1);color:var(--fg-4)}
+.sh-ro .sh-c{color:var(--fg-2)}
+.sh-ro .sh-w--calc{border-left-color:rgba(0,228,228,0.45)}
+
+/* =========================================================
+   Status bar — the note editor's footer row, sheet counts
+   ========================================================= */
+.sh-status{display:flex;align-items:center;gap:12px;padding:9px 18px;border-top:1px solid var(--border-faint);flex-shrink:0;font-size:11.5px;color:var(--fg-4)}
+.sh-status b{color:var(--fg-3);font-weight:400;font-variant-numeric:tabular-nums}
+.sh-status__sp{flex:1}
+.sh-status__calc{display:inline-flex;align-items:center;gap:5px;color:var(--fg-3)}
+.sh-status__wedge{width:0;height:0;border-left:5px solid var(--accent);border-top:5px solid transparent}
+
+/* =========================================================
+   ADDENDUM · New Sheet button + select choices editor
+   Appended after review. Nothing above this line changed.
+   ========================================================= */
+
+/* The New Sheet button is the inverse of the kit's .btn--primary: identical
+   geometry (the kit's own .btn box), transparent ground, cyan border and
+   label. The kit's .btn--ghost was too recessive to read as a sibling —
+   fg-3 on a faint border reads as tertiary, not secondary. */
+.btn--outline{background:transparent;color:var(--accent);border-color:rgba(0,228,228,0.42)}
+.btn--outline:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.sh-hdr{display:flex;align-items:center;gap:14px;padding:0 22px;height:60px;border-bottom:1px solid var(--border-faint);background:var(--bg);box-sizing:border-box}
+.sh-hdr__title{font-size:20px;font-weight:600;color:var(--fg-1);letter-spacing:-0.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sh-hdr__sp{flex:1;min-width:8px}
+.sh-hdr__pair{display:flex;align-items:center;gap:8px;flex-shrink:0}
+
+/* choices editor — the nested panel behind "Edit options…" */
+.sh-opt{width:252px;box-sizing:border-box;background:#1c1c20;border:1px solid var(--border-strong);border-radius:10px;box-shadow:var(--shadow-pop);padding:5px}
+.sh-opt__head{display:flex;align-items:center;gap:7px;padding:7px 8px 6px}
+.sh-opt__back{width:20px;height:20px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:var(--fg-3);flex-shrink:0}
+.sh-opt__back:hover{background:var(--overlay-hover);color:var(--fg-1)}
+.sh-opt__t{font-size:12.5px;font-weight:600;color:var(--fg-1);flex:1;min-width:0}
+.sh-opt__n{font-family:var(--font-mono);font-size:10px;color:var(--fg-4)}
+.sh-opt__list{padding:2px 0}
+.sh-opt__i{display:flex;align-items:center;gap:6px;padding:4px 6px 4px 4px;border-radius:var(--radius-sm)}
+.sh-opt__i:hover{background:var(--overlay-hover)}
+.sh-opt__grip{width:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--fg-4);cursor:grab}
+.sh-opt__i:hover .sh-opt__grip{color:var(--fg-3)}
+.sh-opt__val{flex:1;min-width:0}
+.sh-opt__x{width:20px;height:20px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:var(--fg-4);flex-shrink:0;opacity:0}
+.sh-opt__i:hover .sh-opt__x{opacity:1}
+.sh-opt__x:hover{background:rgba(239,68,68,0.13);color:var(--status-danger)}
+.sh-opt__i.is-drag{background:var(--surface-2);box-shadow:0 6px 18px rgba(0,0,0,0.45)}
+.sh-opt__i.is-drag .sh-opt__grip{color:var(--accent)}
+.sh-opt__drop{height:2px;background:var(--accent);border-radius:1px;margin:1px 6px}
+.sh-opt__add{display:flex;align-items:center;gap:7px;width:100%;padding:7px 8px;margin-top:2px;border:0;background:transparent;border-radius:var(--radius-sm);color:var(--fg-3);font-family:var(--font-sans);font-size:12.5px;text-align:left;cursor:pointer}
+.sh-opt__add:hover{background:var(--overlay-hover);color:var(--fg-1)}
+.sh-opt__add .sh-pop__ico{color:var(--accent)}
+.sh-opt__in{width:100%;box-sizing:border-box;background:var(--surface-2);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:5px 8px;color:var(--fg-1);font-family:var(--font-sans);font-size:12.5px}
+/* duplicate commit attempt: the field keeps focus and the typed text, takes
+   the danger ring, and shakes once. The refusal explains itself below. */
+.sh-opt__in.is-error{border-color:var(--status-danger);box-shadow:0 0 0 2px rgba(239,68,68,0.18);animation:sh-shake 240ms var(--ease)}
+@keyframes sh-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}45%{transform:translateX(3px)}70%{transform:translateX(-2px)}}
+.sh-opt__err{display:flex;align-items:flex-start;gap:6px;padding:2px 8px 6px 24px;font-size:11.5px;line-height:1.4;color:var(--status-danger)}
+.sh-opt__err svg{flex-shrink:0;margin-top:2px}
+.sh-opt__foot{padding:7px 9px 5px;border-top:1px solid var(--border-faint);margin-top:4px;font-size:11.5px;color:var(--fg-4);line-height:1.45}
+.sh-opt__empty{padding:4px 9px 10px;font-size:12px;color:var(--fg-4);line-height:1.5}
+.sh-opt__empty b{color:var(--fg-2);font-weight:500}
+.sh-chipfake{display:inline-flex;align-items:center;max-width:100%;padding:2px 8px;border-radius:var(--radius-sm);background:var(--surface-2);border:1px solid var(--border);font-size:11.5px;font-weight:500;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* =========================================================
+   Canvas annotation frame (house style, matches Note Blocks)
+
+   Stages are fixed-width by design (they are specimens of real UI at real
+   sizes). Captions must therefore WRAP below a stage when the viewing
+   column is narrower than stage + caption — never push the row wider than
+   the column and hide themselves off-screen. Every row inside a frame
+   wraps, including the plain flex rows the screens compose inline.
+   ========================================================= */
+.sh-frame{padding:34px;display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start;background:#0a0a0f;min-height:100%;box-sizing:border-box}
+.sh-frame--stack{flex-direction:column;flex-wrap:nowrap;gap:24px}
+/* the inline rows screens build with style={{display:'flex'}} */
+.sh-frame>div[style*="flex"],.sh-frame--stack>div>div[style*="flex"]{flex-wrap:wrap}
+/* Caption/annotation rows must not push a frame wider than its column.
+   Stages are exempt: a specimen renders at its authored size and the frame
+   body scrolls instead (a clamped stage silently hides its own content in
+   the grid's overflow box, which is worse than a scrollbar). */
+.sh-frame--stack>div:not(.sh-stage):not(:has(.sh-stage)){max-width:100%}
+/* A caption in a stacked frame gets the full column, however deeply the
+   screen nests it \u2014 the 296px cap is for side-by-side rows only. */
+.sh-frame--stack .sh-cap{max-width:100%}
+.sh-stage{flex-shrink:0;position:relative}
+.sh-cap{max-width:296px;flex-shrink:0;flex-grow:1;min-width:min(296px,100%)}
+.sh-stage{max-width:none;flex-shrink:0}
+.sh-cap h4{margin:0 0 5px;font-size:14px;color:var(--fg-1);font-weight:600}
+.sh-cap p{margin:0 0 12px;font-size:12.5px;line-height:1.5;color:var(--fg-3)}
+.sh-callout{display:block;font-family:var(--font-mono);font-size:10.5px;color:var(--accent);text-transform:lowercase;letter-spacing:0.02em;margin-bottom:10px}
+.sh-anno{display:flex;align-items:flex-start;gap:9px;margin-top:10px}
+.sh-anno__dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:6px}
+.sh-anno__dot--warn{background:var(--status-warning)}
+.sh-anno__dot--danger{background:var(--status-danger)}
+.sh-anno__dot--mute{background:var(--fg-4)}
+.sh-anno__t{font-size:12.5px;color:var(--fg-3);line-height:1.45}
+.sh-anno__t b{color:var(--fg-1);font-weight:500}
+.sh-anno__t code{font-family:var(--font-mono);font-size:11px;background:var(--surface-2);color:var(--fg-2);padding:1px 5px;border-radius:3px}
+.sh-legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.sh-legend__i{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--fg-3)}
+.sh-flag{margin-top:14px;padding:10px 11px;border-radius:var(--radius-md);background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.22)}
+.sh-flag__l{font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--status-warning);display:block;margin-bottom:5px}
+.sh-flag__t{font-size:12px;color:var(--fg-2);line-height:1.5}

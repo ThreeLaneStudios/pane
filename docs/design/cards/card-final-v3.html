@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pane Card Final v3</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; color: #fff; font-family: system-ui, -apple-system, sans-serif; padding: 32px; }
+h1 { font-size: 16px; color: rgba(255,255,255,0.5); margin-bottom: 24px; font-weight: 400; }
+h2 { font-size: 13px; color: rgba(255,255,255,0.35); margin-bottom: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px; }
+.layout { display: flex; gap: 48px; }
+.column { display: flex; flex-direction: column; gap: 4px; }
+.wide-col { width: 480px; }
+.narrow-col { width: 250px; }
+.card-wide {
+  height: 120px; background: rgba(255,255,255,0.05); border-radius: 6px; padding: 10px 10px 8px 10px;
+  display: grid; grid-template-rows: 18px 1fr 16px; border-left: 3px solid transparent;
+}
+.card-narrow {
+  height: 48px; background: rgba(255,255,255,0.05); border-radius: 5px; padding: 6px 8px;
+  display: grid; grid-template-rows: 1fr 1fr; gap: 2px; border-left: 3px solid transparent;
+}
+.status-todo { border-left-color: #00E4E4; }
+.status-progress { border-left-color: #FF8C00; }
+.status-done { border-left-color: #00C853; }
+.active { background: rgba(0,228,228,0.06); }
+.row-top { display: flex; align-items: center; gap: 6px; }
+.row-mid { display: flex; flex-direction: column; justify-content: center; gap: 1px; }
+.row-bot { display: flex; align-items: center; gap: 6px; }
+.title { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.title-sm { font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.preview { font-size: 11px; color: rgba(255,255,255,0.4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+.spacer { flex: 1; }
+.pill-priority { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; white-space: nowrap; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.3px; }
+.pill-priority.urgent { background: rgba(255,68,68,0.2); color: #FF4444; }
+.pill-priority.high { background: rgba(255,140,0,0.2); color: #FF8C00; }
+.pill-priority-sm { font-size: 9px; font-weight: 600; padding: 0px 4px; border-radius: 2px; white-space: nowrap; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.3px; }
+.pill-priority-sm.urgent { background: rgba(255,68,68,0.2); color: #FF4444; }
+.pill-priority-sm.high { background: rgba(255,140,0,0.2); color: #FF8C00; }
+.folder { font-size: 10px; color: rgba(255,255,255,0.25); white-space: nowrap; flex-shrink: 0; }
+.folder-sm { font-size: 9px; color: rgba(255,255,255,0.2); white-space: nowrap; flex-shrink: 0; }
+.pill-assignee { font-size: 10px; padding: 1px 6px; border-radius: 3px; border: 1px solid rgba(0,228,228,0.4); color: #00E4E4; white-space: nowrap; flex-shrink: 0; }
+.pill-assignee-sm { font-size: 9px; padding: 0px 4px; border-radius: 2px; border: 1px solid rgba(0,228,228,0.35); color: rgba(0,228,228,0.8); white-space: nowrap; flex-shrink: 0; }
+.due { font-size: 10px; color: rgba(255,255,255,0.35); white-space: nowrap; }
+.due-sm { font-size: 9px; color: rgba(255,255,255,0.3); white-space: nowrap; }
+.pill-subtasks { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; background: rgba(0,228,228,0.12); color: rgba(0,228,228,0.7); white-space: nowrap; margin-left: auto; }
+.pill-subtasks-sm { font-size: 9px; font-weight: 600; padding: 0px 4px; border-radius: 2px; background: rgba(0,228,228,0.1); color: rgba(0,228,228,0.6); white-space: nowrap; margin-left: auto; }
+.hidden { visibility: hidden; }
+</style>
+</head>
+<body>
+<h1>Pane — Card Final v3</h1>
+<div class="layout">
+<div>
+  <h2>Wide (480 × 120) — Editor Closed</h2>
+  <div class="column wide-col">
+    <div class="card-wide status-todo active">
+      <div class="row-top"><span class="title">Trunk</span><span class="spacer"></span><span class="pill-priority high">High</span><span class="spacer"></span><span class="folder">Cabinet</span></div>
+      <div class="row-mid">
+        <span class="preview">The trunk is one of the defining features of the Volkswagen</span>
+        <span class="preview">Beetle, known for its front-mounted trunk or "frunk" design...</span>
+      </div>
+      <div class="row-bot"><span class="pill-assignee">Matt</span><span class="due">Apr 2, 2026</span><span class="pill-subtasks">Subtasks 2</span></div>
+    </div>
+    <div class="card-wide">
+      <div class="row-top"><span class="title">This is in doors</span><span class="spacer"></span><span class="pill-priority hidden">—</span><span class="spacer"></span><span class="folder">Cabinet</span></div>
+      <div class="row-mid">
+        <span class="preview">asdfsdafasdfasdf</span>
+        <span class="preview hidden">—</span>
+      </div>
+      <div class="row-bot"><span class="pill-assignee hidden">—</span><span class="due hidden">—</span><span class="pill-subtasks hidden">—</span></div>
+    </div>
+    <div class="card-wide status-progress">
+      <div class="row-top"><span class="title">Sidedoor</span><span class="spacer"></span><span class="pill-priority urgent">Urgent</span><span class="spacer"></span><span class="folder hidden">—</span></div>
+      <div class="row-mid">
+        <span class="preview hidden">—</span>
+        <span class="preview hidden">—</span>
+      </div>
+      <div class="row-bot"><span class="pill-assignee hidden">—</span><span class="due">Apr 10, 2026</span><span class="pill-subtasks hidden">—</span></div>
+    </div>
+    <div class="card-wide">
+      <div class="row-top"><span class="title">Suicide Doors</span><span class="spacer"></span><span class="pill-priority hidden">—</span><span class="spacer"></span><span class="folder">Cabinet</span></div>
+      <div class="row-mid">
+        <span class="preview hidden">—</span>
+        <span class="preview hidden">—</span>
+      </div>
+      <div class="row-bot"><span class="pill-assignee hidden">—</span><span class="due hidden">—</span><span class="pill-subtasks hidden">—</span></div>
+    </div>
+  </div>
+</div>
+<div>
+  <h2>Narrow (250 × 48) — Editor Open</h2>
+  <div class="column narrow-col">
+    <div class="card-narrow status-todo active">
+      <div class="row-top"><span class="title-sm">Trunk</span><span class="spacer"></span><span class="pill-priority-sm high">High</span><span class="spacer"></span><span class="folder-sm">Cabinet</span></div>
+      <div class="row-bot"><span class="pill-assignee-sm">Matt</span><span class="due-sm">Apr 2</span><span class="pill-subtasks-sm">Subtasks 2</span></div>
+    </div>
+    <div class="card-narrow">
+      <div class="row-top"><span class="title-sm">This is in doors</span><span class="spacer"></span><span class="pill-priority-sm hidden">—</span><span class="spacer"></span><span class="folder-sm">Cabinet</span></div>
+      <div class="row-bot"><span class="pill-assignee-sm hidden">—</span><span class="due-sm hidden">—</span><span class="pill-subtasks-sm hidden">—</span></div>
+    </div>
+    <div class="card-narrow status-progress">
+      <div class="row-top"><span class="title-sm">Sidedoor</span><span class="spacer"></span><span class="pill-priority-sm urgent">Urgent</span><span class="spacer"></span><span class="folder-sm hidden">—</span></div>
+      <div class="row-bot"><span class="pill-assignee-sm hidden">—</span><span class="due-sm">Apr 10</span><span class="pill-subtasks-sm hidden">—</span></div>
+    </div>
+    <div class="card-narrow">
+      <div class="row-top"><span class="title-sm">Suicide Doors</span><span class="spacer"></span><span class="pill-priority-sm hidden">—</span><span class="spacer"></span><span class="folder-sm">Cabinet</span></div>
+      <div class="row-bot"><span class="pill-assignee-sm hidden">—</span><span class="due-sm hidden">—</span><span class="pill-subtasks-sm hidden">—</span></div>
+    </div>
+  </div>
+</div>
+</div>
+</body>
+</html>

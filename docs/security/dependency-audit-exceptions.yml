@@ -1,0 +1,401 @@
+# Dependency-audit exception manifest — Refs #3106 (4.5 scope: dependency-audit gate)
+#
+# This is the ONLY place a finding gets suppressed. Neither cargo-audit's
+# audit.toml `ignore` array nor pnpm's `pnpm.auditConfig.ignoreCves` supports
+# a reason or an expiry — both are bare ID lists with no enforceable
+# metadata (TOML comments are unparseable by cargo-audit; package.json has
+# no per-entry field at all). scripts/check-dependency-exceptions.sh reads
+# this file, builds the tool-native suppressions, and — independent of
+# whatever cargo-audit/pnpm audit themselves report — fails the job outright
+# if `today > review_by` for ANY entry, on every PR run and on the weekly
+# schedule. A stale entry does not quietly keep suppressing its finding; it
+# actively breaks CI until a human re-justifies it (bumps review_by — a
+# diff, visible in review and git blame) or removes the entry and fixes the
+# underlying finding. "Nothing is silenced silently."
+#
+# Fields:
+#   id        - RUSTSEC-xxxx-xxxx (cargo scopes) or the pnpm advisory ID (pnpm scope)
+#   package   - the package the finding is reported against
+#   scope     - cargo-tauri | cargo-gateway | pnpm
+#   reason    - why this isn't fixed in THIS PR (not why it's safe forever)
+#   added     - date this entry was created
+#   review_by - hard deadline; CI fails after this date until renewed or removed
+
+# ---------------------------------------------------------------------------
+# cargo-tauri — deferred to their own follow-up PRs (see PR body for issue links)
+# ---------------------------------------------------------------------------
+
+- id: RUSTSEC-2026-0459
+  package: libsqlite3-sys
+  scope: cargo-tauri
+  reason: >
+    0.30.1 -> >=0.39.0 is a 9-minor jump that also requires a coordinated
+    rusqlite bump (rusqlite 0.32's own Cargo.toml constrains how far
+    libsqlite3-sys can move without it). Corrected framing, verified against
+    source: crsqlite.dylib has NO mechanical link to this crate or to
+    src-tauri/Cargo.lock — it is built by
+    scripts/build-crsqlite-universal.sh from a separate, pinned
+    vlcn-io/cr-sqlite clone, under its own toolchain, and "1631456" (the
+    dylib's byte count) appears zero times in scripts/ or
+    .github/workflows/. The real risk is extension-ABI compatibility: cr-sqlite
+    is a loadable extension built against a 2024-era SQLite header set, and a
+    9-minor jump in the bundled SQLite libsqlite3-sys compiles changes the
+    engine it gets loaded into. That needs verification via the
+    fresh-install/upgrade smoke tests that exercise crsql_internal_sync_bit
+    and friends, not a version-number edit inside a CI-hardening PR.
+  added: 2026-11-10
+  review_by: 2026-12-01
+
+- id: RUSTSEC-2026-0429
+  package: zip
+  scope: cargo-tauri
+  reason: >
+    GHSA-q7v9-x93c-xqv3, ZipArchive::extract() aborts the process on a
+    symlink entry with an oversized declared size. Re-justified #3217
+    bucket-2/3: pane's own direct zip dependency (src-tauri/src/
+    attachments.rs's docx extractor, ZipArchive::new / .by_name() /
+    ZipWriter::new / SimpleFileOptions, test-fixture-only writer) moved to
+    9.6.0 in this PR, off the vulnerable 4.6.1 line entirely. This advisory
+    stays open and this entry stays in place because the remaining 4.x
+    resolution is tauri-plugin-updater@2.11.0's own pin (zip = "^4",
+    cfg(target_os = "windows") only, confirmed via crates.io's dependencies
+    API); Pane ships no Windows build, and this PR cannot move a pin inside
+    a third-party plugin crate. src-tauri/Cargo.lock now carries two zip
+    entries (9.6.0 for pane, 4.6.1 for the plugin's Windows-only branch) by
+    design, not by omission; Cargo.lock is not platform-filtered, so
+    cargo-audit will keep finding the lingering entry on every platform.
+    This bump is hygiene for pane's own code, not a closure of this advisory.
+  added: 2026-11-16
+  review_by: 2027-01-15
+
+- id: RUSTSEC-2026-0367
+  package: zip
+  scope: cargo-tauri
+  reason: >
+    SUID/SGID bits preserved during ZIP extraction (privilege-escalation
+    shape). Same reachability finding and same coordinated-bump deferral as
+    RUSTSEC-2026-0429 above — see that entry for the full trace.
+  added: 2026-11-10
+  review_by: 2026-12-15
+
+- id: RUSTSEC-2026-0368
+  package: zip
+  scope: cargo-tauri
+  reason: >
+    ZipArchive::extract() can create symlinks whose targets resolve outside
+    the destination directory. Same reachability finding and same
+    coordinated-bump deferral as RUSTSEC-2026-0429 above.
+  added: 2026-11-10
+  review_by: 2026-12-15
+
+- id: RUSTSEC-2026-0369
+  package: zip
+  scope: cargo-tauri
+  reason: >
+    Permissions applied through unconfined symlink targets during
+    extraction. Same reachability finding and same coordinated-bump
+    deferral as RUSTSEC-2026-0429 above.
+  added: 2026-11-10
+  review_by: 2026-12-15
+
+- id: RUSTSEC-2024-0429
+  package: glib
+  scope: cargo-tauri
+  reason: >
+    GHSA-wrw7-89jp-8q8g, Tauri's own Linux GTK/webkit2gtk stack (gtk,
+    webkit2gtk, gdk, pango, soup3...) pins glib ^0.18; the fix lands at
+    0.20.0, a major bump with no same-major patch reachable from inside
+    this PR's scope (#3217 bucket-2/3 is vitest + zip only). Bookkeeping
+    entry: cargo-audit classifies this specific advisory as an `unsound`
+    warning, not a `vulnerability`; cmd_cargo's default `cargo audit` call
+    (no --deny flag) already exits 0 on this finding today with zero
+    manifest entries for it. This entry changes nothing the gate enforces;
+    it exists so every open Dependabot alert for glib has somewhere to
+    point in the acceptance table.
+  added: 2026-11-16
+  review_by: 2027-01-15
+
+- id: RUSTSEC-2026-0548
+  package: zip
+  scope: cargo-tauri
+  reason: >
+    "Zip Cloaking" RCE, critical (GHSA-m665-v7pm-7grj). Covered by the same
+    tauri-plugin-updater zip = "^4" reasoning as RUSTSEC-2026-0429 above,
+    verified directly against crates.io's dependency API for
+    tauri-plugin-updater 2.11.0: the zip dependency is
+    target=cfg(target_os="windows") only, and Pane ships no Windows build,
+    so this finding is unreachable in any binary Pane produces. Was
+    bookkeeping-only (GHSA id with no RUSTSEC counterpart, so cargo audit
+    --ignore couldn't reference it) until RUSTSEC-2026-0548 was assigned
+    2026-11-17; this entry's id field is updated to the now-real RUSTSEC
+    id so the suppression actually takes effect, and the reasoning was
+    already correct and is unchanged.
+  added: 2026-11-16
+  review_by: 2027-01-15
+
+- id: RUSTSEC-2026-0545
+  package: zip
+  scope: cargo-tauri
+  reason: >
+    AES/HMAC verification bypass, medium (GHSA-8hxf-qr8p-62x4). Same
+    tauri-plugin-updater zip = "^4" reasoning as RUSTSEC-2026-0548 above.
+    Was bookkeeping-only until RUSTSEC-2026-0545 was assigned 2026-11-17;
+    this entry's id field is updated to the now-real RUSTSEC id so the
+    suppression actually takes effect, and the reasoning was already
+    correct and is unchanged.
+  added: 2026-11-16
+  review_by: 2027-01-15
+
+# ---------------------------------------------------------------------------
+# pnpm — build/test-tool-only. Each traced to its actual parent (not assumed
+# from the package name); none of this code ships in the adapter-static
+# output the Tauri binary embeds. Longer review window than the
+# code-reachable fixes above because there is no shipping-code urgency, but
+# still a hard date, not an indefinite pass.
+# ---------------------------------------------------------------------------
+
+- id: "1139528"
+  package: vitest
+  scope: pnpm
+  reason: >
+    Vitest UI server can read/execute arbitrary files when listening.
+    Direct devDependencies entry — the test runner itself, never bundled
+    into the adapter-static build output, never run in the shipped app.
+  added: 2026-11-10
+  review_by: 2027-02-10
+
+- id: "1241260"
+  package: tinypool
+  scope: pnpm
+  reason: >
+    Prototype-pollution gadget in worker options leading to RCE. Vitest's
+    worker-pool dependency — devDependency-only test tooling, never bundled
+    into the adapter-static output.
+  added: 2026-11-10
+  review_by: 2027-02-10
+
+- id: "1241261"
+  package: tinypool
+  scope: pnpm
+  reason: >
+    Prototype-pollution gadget to RCE in run() options. Same Vitest
+    worker-pool dependency and same never-bundled reasoning as 1241260
+    above.
+  added: 2026-11-10
+  review_by: 2027-02-10
+
+- id: GHSA-82fw-gwwq-j7x9
+  package: "@vitest/mocker"
+  scope: pnpm
+  reason: >
+    CVE-2026-84373, path traversal / arbitrary file read via
+    @vitest/mocker's redirect-mock handling. Medium severity, below the
+    gate's --audit-level=high floor. Transitive dependency introduced by
+    this PR's vitest 1.6.1 -> 3.2.7 bump (#3217 bucket 2/3); first patched
+    only at @vitest/mocker 4.1.11+, which ships with vitest 4.x, outside
+    this PR's exact-3.2.7 ruling. Matt's ruling: no vitest 4 before launch.
+  added: 2026-11-16
+  review_by: 2027-01-15
+
+- id: GHSA-qxg6-89mg-rqv8
+  package: "@vitest/mocker"
+  scope: pnpm
+  reason: >
+    CVE-2026-112949, code injection via unauthenticated manual mock
+    registration in @vitest/mocker. Medium severity, below the gate's
+    --audit-level=high floor. Transitive dependency introduced by this
+    PR's vitest 1.6.1 -> 3.2.7 bump (#3217 bucket 2/3); first patched only
+    at @vitest/mocker 4.1.12+, which ships with vitest 4.x, outside this
+    PR's exact-3.2.7 ruling. Matt's ruling: no vitest 4 before launch.
+  added: 2026-11-16
+  review_by: 2027-01-15
+
+- id: "1113515"
+  package: rollup
+  scope: pnpm
+  reason: >
+    Arbitrary file write via path traversal. vite's internal bundler — the
+    build-time tool itself, not its output; never ships, never runs against
+    attacker input.
+  added: 2026-11-10
+  review_by: 2027-02-10
+
+- id: "1124252"
+  package: postcss
+  scope: pnpm
+  reason: >
+    Arbitrary file read via attacker-controlled sourceMappingURL in CSS
+    comments. vite's CSS pipeline, build-time only — the sourceMappingURL
+    auto-load only runs against repo-controlled, trusted source during
+    `vite build`, never attacker input.
+  added: 2026-11-10
+  review_by: 2027-02-10
+
+- id: "1139510"
+  package: postcss
+  scope: pnpm
+  reason: >
+    Path traversal in previous-source-map auto-loading leading to arbitrary
+    .map file disclosure. Same build-time-only reasoning as 1124252 above.
+  added: 2026-11-10
+  review_by: 2027-02-10
+
+- id: "1241209"
+  package: source-map-js
+  scope: pnpm
+  reason: >
+    Event-loop denial of service via indexed source-map section offsets.
+    postcss's own sourcemap generator — build-time only.
+  added: 2026-11-10
+  review_by: 2027-02-10
+
+- id: "1115554"
+  package: picomatch
+  scope: pnpm
+  reason: >
+    ReDoS via extglob quantifiers. Pulled by fdir/tinyglobby/vite for
+    build-time/dev-server glob matching — never runs against untrusted
+    input in the shipped app.
+  added: 2026-11-10
+  review_by: 2027-02-10
+
+- id: "1116232"
+  package: vite
+  scope: pnpm
+  reason: >
+    server.fs.deny bypassed with queries. Direct devDependencies entry;
+    requires a running `vite dev` server, which the build pipeline (`vite
+    build`, adapter-static pre-build) never starts and CI never runs.
+  added: 2026-11-10
+  review_by: 2027-02-10
+
+- id: "1116235"
+  package: vite
+  scope: pnpm
+  reason: >
+    Arbitrary file read via the Vite dev-server WebSocket. Same
+    dev-server-only, never-started-in-build reasoning as 1116232 above.
+  added: 2026-11-10
+  review_by: 2027-02-10
+
+- id: "1242658"
+  package: vite
+  scope: pnpm
+  reason: >
+    launch-editor fs.existsSync() bypass on Windows. Only runs from the dev
+    error-overlay — never starts in the build pipeline or in CI, same as
+    1116232 above.
+  added: 2026-11-10
+  review_by: 2027-02-10
+
+- id: "1242659"
+  package: vite
+  scope: pnpm
+  reason: >
+    launch-editor fs.existsSync() bypass on Windows (second advisory, same
+    root cause). Same dev-only reasoning as 1242658 above.
+  added: 2026-11-10
+  review_by: 2027-02-10
+
+- id: "1243067"
+  package: "@sveltejs/kit"
+  scope: pnpm
+  reason: >
+    GHSA-pfhg-q3qv-9q6r, open redirect via `use:enhance`-submitted forms on
+    catch-all routes beginning with "//". First-patched version is 3.0.0;
+    2.70.4 is the last 2.x release ever published, so there is no patch to
+    apply without the major bump #3217's own ruling excludes from this PR.
+    Same deferral as 1116433/1247438 below; the SvelteKit 3 migration
+    (umbrella #3217, post-launch roadmap) addresses this together with the
+    other open @sveltejs/kit alerts.
+  added: 2026-11-16
+  review_by: 2027-01-15
+
+- id: "1243076"
+  package: "@sveltejs/kit"
+  scope: pnpm
+  reason: >
+    GHSA-27mw-82g8-phjj, XSS via an untrusted cache-control header value
+    SvelteKit inserts unescaped into a prerendered page's
+    <meta http-equiv="cache-control"> tag. First-patched version is 3.0.0;
+    no 2.x backport exists. Confirmed unreachable as currently used: this
+    app does not call setHeaders() with any externally-influenced
+    cache-control value during prerender. Deferred for the same
+    major-version-jump reason as the sibling @sveltejs/kit entries.
+  added: 2026-11-16
+  review_by: 2027-01-15
+
+- id: "1247439"
+  package: "@sveltejs/kit"
+  scope: pnpm
+  reason: >
+    GHSA-6cf5-gc4q-fm3x, private (non-exported) query.batch functions
+    could share a batch, leaking one function's arguments into another.
+    Only affects apps using the experimental remote-functions flag with
+    non-exported query.batch functions. Confirmed unreachable: no
+    svelte.config.js experimental.remoteFunctions flag and zero
+    *.remote.js / *.remote.ts files anywhere in the tree, same as
+    1247438's reasoning. First-patched version is 3.0.0; no 2.x backport
+    exists; appeared 2026-11-16, after the original #3217 triage.
+  added: 2026-11-16
+  review_by: 2027-01-15
+
+- id: "1243505"
+  package: deepmerge
+  scope: pnpm
+  reason: >
+    GHSA-gcqx-w48m-w2h4, prototype-poisoning in mergeObject() via
+    attacker-controlled source-object keys. Pulled by
+    @sveltejs/vite-plugin-svelte ← @sveltejs/kit (build-time tooling, not
+    shipped app code). No fix available upstream: first_patched_version is
+    null as of this pull, confirmed live, not assumed from the original
+    triage. Nothing to bump to; re-check on the next scheduled audit run.
+  added: 2026-11-16
+  review_by: 2027-01-15
+
+- id: "1116433"
+  package: "@sveltejs/kit"
+  scope: pnpm
+  reason: >
+    @sveltejs/adapter-node has a BODY_SIZE_LIMIT bypass. Names adapter-node
+    specifically; svelte.config.js confirms this app uses adapter-static —
+    the vulnerable Node-HTTP-server code path does not exist in this build
+    target at all.
+  added: 2026-11-10
+  review_by: 2027-02-10
+
+- id: "1247438"
+  package: "@sveltejs/kit"
+  scope: pnpm
+  reason: >
+    Denial-of-service in the experimental remote-functions form-data parser
+    (GHSA-3r8g-jcqq-3p5j, CVE-2026-128120). First-patched version is 3.1.1;
+    2.70.4 is the last 2.x release ever published (3.0.0-next.* lands
+    directly at 3.0.0, no 2.x backport exists), so there is no patch to
+    apply without a major-version jump. Deferred, not fixed: the ruling is
+    no major dependency bump before launch, and the SvelteKit 3 migration
+    (umbrella #3217, post-launch roadmap) will address this advisory
+    together with the other two open @sveltejs/kit alerts. Confirmed
+    unreachable in this app: no svelte.config.js
+    experimental.remoteFunctions flag and zero *.remote.js / *.remote.ts
+    files anywhere in the tree.
+  added: 2026-11-16
+  review_by: 2027-01-15
+
+- id: "1123259"
+  package: ws
+  scope: pnpm
+  reason: >
+    Memory exhaustion DoS from tiny fragments and data chunks. Pulled by
+    jsdom (Vitest's DOM-simulation dependency) — test-only, never ships.
+  added: 2026-11-10
+  review_by: 2027-02-10
+
+- id: "1120743"
+  package: form-data
+  scope: pnpm
+  reason: >
+    CRLF injection via unescaped multipart field names and filenames.
+    Pulled by jsdom — test-only, never ships, same as ws (1123259) above.
+  added: 2026-11-10
+  review_by: 2027-02-10

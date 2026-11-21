@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Pane — Sheets (scroll view)</title>
+<link rel="stylesheet" href="./colors_and_type.css"/>
+<link rel="stylesheet" href="./kit.css"/>
+<link rel="stylesheet" href="sheets.css"/>
+<style>
+html,body{margin:0;background:#0a0a0f;height:auto;overflow:visible}
+/* kit.css locks html/body to overflow:hidden for the app window demo — this
+   page is a scrolling document, so it has to win that back. */
+html{overflow-y:auto}
+body{font-family:var(--font-sans)}
+.doc{max-width:1520px;margin:0 auto;padding:44px 32px 120px}
+.doc__head{padding:0 0 20px;border-bottom:1px solid var(--border-faint)}
+.doc__title{font-size:26px;font-weight:700;color:var(--fg-1);margin:0 0 8px;letter-spacing:-0.02em}
+.doc__sub{font-size:14px;line-height:1.6;color:var(--fg-3);margin:0;max-width:860px}
+.sec{padding:44px 0 8px}
+.sec__title{font-size:18px;font-weight:600;color:var(--fg-1);margin:0 0 4px}
+.sec__sub{font-size:13px;color:var(--fg-4);margin:0 0 22px;line-height:1.55;max-width:860px}
+.frames{display:flex;flex-direction:column;gap:24px}
+.fw{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#0a0a0f}
+.fw__lab{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-4);padding:10px 14px;border-bottom:1px solid var(--border-faint);background:var(--surface-1)}
+.fw__body{overflow:auto}
+.toc{position:sticky;top:0;z-index:20;background:rgba(10,10,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--border-faint);display:flex;gap:4px;flex-wrap:wrap;padding:10px 32px}
+.toc a{font-size:12px;color:var(--fg-3);text-decoration:none;padding:5px 10px;border-radius:999px}
+.toc a:hover{background:var(--overlay-hover);color:var(--fg-1)}
+</style>
+</head>
+<body>
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="#0A0A0F"/>
+    <rect x="18" y="26" width="64" height="48" rx="4" fill="#141417" stroke="rgba(240,237,232,0.16)" stroke-width="1.2"/>
+    <rect x="18" y="26" width="64" height="10" fill="#232327"/>
+    <path d="M34 26v48M50 26v48M66 26v48M18 46h64M18 60h64" stroke="rgba(240,237,232,0.12)" stroke-width="1"/>
+    <rect x="50" y="46" width="16" height="14" fill="rgba(0,228,228,0.14)"/>
+    <path d="M50 60l5-5v5z" fill="#00E4E4"/>
+    <rect x="22" y="29" width="8" height="4" rx="1" fill="#00E4E4"/>
+  </svg>
+</template>
+<div class="toc">
+  <a href="#s-grid">1 · Grid editor</a>
+  <a href="#s-formula">2 · Formula</a>
+  <a href="#s-styling">3 · Cell styling</a>
+  <a href="#s-card">4 · Board card</a>
+  <a href="#s-history">5 · Version history</a>
+  <a href="#s-export">6 · CSV export</a>
+</div>
+<div class="doc">
+  <div class="doc__head">
+    <h1 class="doc__title">Pane — Sheets</h1>
+    <p class="doc__sub">A structured-table note type: typed columns, cell styling, formulas. Opens in the note editor's overlay with Kanban scrolling beneath. Corner markers carry the cell language — bottom-left cyan wedge = computed, bottom-left red = formula error, top-right amber = type mismatch. Scroll top to bottom; every frame carries its own annotations.</p>
+  </div>
+  <div id="mount"></div>
+</div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="pane-ui.jsx"></script>
+<script type="text/babel" src="sheets-shared.jsx"></script>
+<script type="text/babel" src="sheets-grid.jsx"></script>
+<script type="text/babel" src="sheets-formula.jsx"></script>
+<script type="text/babel" src="sheets-surfaces.jsx"></script>
+<script type="text/babel">
+function Sec({ id, title, sub, children }) {
+  return (
+    <section className="sec" id={id}>
+      <h2 className="sec__title">{title}</h2>
+      <p className="sec__sub">{sub}</p>
+      <div className="frames">{children}</div>
+    </section>
+  );
+}
+function F({ label, children }) {
+  return <div className="fw"><div className="fw__lab">{label}</div><div className="fw__body">{children}</div></div>;
+}
+function Doc() {
+  return (
+    <React.Fragment>
+      <Sec id="s-grid" title="1 · Grid editor" sub="Sizes are kept, not fitted. Sticky header + gutter. Ghost space that commits on type. Selection, per-type editors, header verbs, resize.">
+        <F label="In context · 1440×900"><ShInContext/></F>
+        <F label="Overflow & sticky bands"><ShOverflow/></F>
+        <F label="Ghost columns & rows"><ShGhost/></F>
+        <F label="A new sheet"><ShNewSheet/></F>
+        <F label="Selection & navigation"><ShSelection/></F>
+        <F label="Per-type cell editors"><ShEditors/></F>
+        <F label="Type mismatch"><ShMismatch/></F>
+        <F label="Column header menu"><ShHeaderMenu/></F>
+        <F label="Sort & filter are view-only"><ShView/></F>
+        <F label="Column & row resize"><ShResize/></F>
+      </Sec>
+      <Sec id="s-formula" title="2 · Formula experience" sub="Formula bar above the grid. Computed values distinguished by a corner wedge. One error treatment for six codes. Paused mode for very formula-heavy sheets.">
+        <F label="Formula bar states"><ShFormulaBar/></F>
+        <F label="Computed vs typed"><ShComputed/></F>
+        <F label="Error cells · all six codes"><ShErrors/></F>
+        <F label="Computation paused"><ShPaused/></F>
+      </Sec>
+      <Sec id="s-styling" title="3 · Cell styling" sub="Background, text color, border style and thickness — from the toolbar or the context menu, on a palette built entirely from Pane's tokens.">
+        <F label="Panel, context menu, palette"><ShStyling/></F>
+        <F label="Styling + wedges coexisting"><ShCoexist/></F>
+      </Sec>
+      <Sec id="s-card" title="4 · Board card face" sub="Sheets on Kanban, project, folder and All Tasks. Built on the kit's kcard, revised to two data rows so a column of sheets costs no more scroll than a column of notes.">
+        <F label="Card face & variants"><ShCard/></F>
+      </Sec>
+      <Sec id="s-history" title="5 · Version history" sub="Existing two-pane shell, untouched. Only the right pane is new: a read-only mini-grid of the snapshot. Plus the source-label states for the left pane.">
+        <F label="Sheet snapshot preview"><ShHistory/></F>
+        <F label="Source labels"><ShSourceLabels/></F>
+      </Sec>
+      <Sec id="s-export" title="6 · CSV export" sub="Per-sheet, user-initiated, straight to the OS save dialog. Where the trigger lives.">
+        <F label="Overflow menu"><ShExport/></F>
+      </Sec>
+    </React.Fragment>
+  );
+}
+ReactDOM.createRoot(document.getElementById('mount')).render(<Doc/>);
+</script>
+</body>
+</html>

@@ -1,0 +1,179 @@
+<script lang="ts">
+  import { invoke } from '@tauri-apps/api/core';
+  import * as api from '$lib/api';
+  
+  let provider = $state('none');
+  let apiKey = $state('');
+  let model = $state('');
+  let endpoint = $state('http://localhost:11434');
+  let loading = $state(false);
+  let errorMessage = $state('');
+  let successMessage = $state('');
+  let ollamaModels = $state<string[]>([]);
+  let testingConnection = $state(false);
+  
+  // Memory settings
+  let memoryEnabled = $state(true);
+  let showMemoryToasts = $state(true);
+  let memoryCount = $state(0);
+  let showMemoryManager = $state(false);
+  let allMemories = $state<any[]>([]);
+  
+  const anthropicModels = [
+    'claude-sonnet-4-20250514',
+    'claude-opus-4-20250514',
+    'claude-3-5-sonnet-20241022',
+    'claude-3-5-haiku-20241022',
+  ];
+  
+  const defaultModels: Record<string, string> = {
+    anthropic: 'claude-sonnet-4-20250514',
+    openrouter: 'anthropic/claude-sonnet-4',
+    ollama: 'llama3.2',
+  };
+  
+  async function loadConfig() {
+    try {
+      const config = await api.aiLoadConfig();
+      provider = config.provider || 'none';
+      apiKey = config.api_key || '';
+      model = config.model || '';
+      endpoint = config.endpoint || 'http://localhost:11434';
+      
+      if (provider === 'ollama') {
+        await checkOllama();
+      }
+    } catch (error) {
+      console.error('Failed to load AI config:', error);
+    }
+  }
+  
+  async function checkOllama() {
+    try {
+      const models = await api.aiCheckOllama();
+      ollamaModels = models;
+      if (!model && models.length > 0) {
+        model = models[0];
+      }
+    } catch (error) {
+      console.warn('Ollama not running:', error);
+      ollamaModels = [];
+    }
+  }
+  
+  async function handleSave() {
+    loading = true;
+    errorMessage = '';
+    successMessage = '';
+    
+    try {
+      // Save to database
+      await api.aiSaveConfig(
+        provider,
+        (provider === 'anthropic' || provider === 'openrouter') ? apiKey : undefined,
+        model || undefined,
+        provider === 'ollama' ? endpoint : undefined
+      );
+      
+      // Configure runtime
+      await api.aiConfigure(
+        provider,
+        (provider === 'anthropic' || provider === 'openrouter') ? apiKey : undefined,
+        model || undefined,
+        provider === 'ollama' ? endpoint : undefined
+      );
+      
+      successMessage = 'AI configuration saved';
+      setTimeout(() => { successMessage = ''; }, 3000);
+    } catch (error: any) {
+      errorMessage = error.toString();
+    } finally {
+      loading = false;
+    }
+  }
+  
+  async function handleTestConnection() {
+    testingConnection = true;
+    errorMessage = '';
+    successMessage = '';
+    
+    try {
+      // Try to configure with current settings
+      await api.aiConfigure(
+        provider,
+        (provider === 'anthropic' || provider === 'openrouter') ? apiKey : undefined,
+        model || undefined,
+        provider === 'ollama' ? endpoint : undefined
+      );
+      
+      successMessage = 'Connection successful';
+      setTimeout(() => { successMessage = ''; }, 3000);
+    } catch (error: any) {
+      errorMessage = error.toString();
+    } finally {
+      testingConnection = false;
+    }
+  }
+  
+  function handleProviderChange(newProvider: string) {
+    provider = newProvider;
+    
+    if (newProvider === 'ollama') {
+      checkOllama();
+    }
+    
+    if (newProvider !== 'none' && !model) {
+      model = defaultModels[newProvider] || '';
+    }
+  }
+  
+  function loadMemorySettings() {
+    memoryEnabled = localStorage.getItem('pane_memory_enabled') !== 'false';
+    showMemoryToasts = localStorage.getItem('pane_memory_toasts') !== 'false';
+  }
+  
+  function saveMemorySettings() {
+    localStorage.setItem('pane_memory_enabled', String(memoryEnabled));
+    localStorage.setItem('pane_memory_toasts', String(showMemoryToasts));
+  }
+  
+  async function loadMemoryCount() {
+    try {
+      const memories: any = await invoke('ai_get_memory', { projectId: null });
+      memoryCount = memories.length;
+    } catch (e) {
+      memoryCount = 0;
+    }
+  }
+  
+  async function loadAllMemories() {
+    try {
+      const memories: any = await invoke('ai_get_memory', { projectId: null });
+      allMemories = memories;
+    } catch (e) {
+      console.error('Failed to load memories:', e);
+      allMemories = [];
+    }
+  }
+  
+  async function deleteMemory(memoryId: string) {
+    try {
+      await invoke('ai_dismiss_memory', { memoryId });
+      allMemories = allMemories.filter(m => m.id !== memoryId);
+      memoryCount = allMemories.length;
+    } catch (e) {
+      console.error('Failed to delete memory:', e);
+    }
+  }
+  
+  async function openMemoryManager() {
+    await loadAllMemories();
+    showMemoryManager = true;
+  }
+  
+  $effect(() => {
+    loadConfig();
+    loadMemorySettings();
+    loadMemoryCount();
+  });
+</script>

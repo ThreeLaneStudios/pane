@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pane Card Options — Wide (480px, editor closed)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    padding: 32px;
+  }
+  h1 { color: #00E4E4; font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  .subtitle { color: #666; font-size: 13px; margin-bottom: 32px; }
+  .options { display: flex; gap: 40px; align-items: flex-start; }
+  .option { flex: 0 0 480px; }
+  .option-label {
+    color: #00E4E4; font-size: 14px; font-weight: 600; letter-spacing: 0.5px;
+    margin-bottom: 6px; text-transform: uppercase;
+  }
+  .option-desc { color: #555; font-size: 12px; margin-bottom: 16px; line-height: 1.4; }
+  .card-list { display: flex; flex-direction: column; gap: 6px; }
+  .card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .card:hover { background: rgba(255,255,255,0.08); }
+  .badge {
+    display: inline-block; font-size: 10px; font-weight: 600;
+    padding: 2px 8px; border-radius: 3px; letter-spacing: 0.3px;
+    text-transform: uppercase; white-space: nowrap; vertical-align: middle;
+  }
+  .badge-todo { background: rgba(0,228,228,0.15); color: #00E4E4; }
+  .badge-inprogress { background: rgba(0,228,228,0.25); color: #00E4E4; }
+  .badge-done { background: rgba(255,255,255,0.08); color: #888; }
+  .badge-cabinet { background: rgba(255,255,255,0.06); color: #666; }
+  .pill {
+    display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 3px;
+    white-space: nowrap; vertical-align: middle; background: rgba(255,255,255,0.04); color: #777;
+  }
+  .pill-folder { color: #888; }
+  .pill-date { color: #888; }
+  .pill-assignee { color: #00E4E4; background: rgba(0,228,228,0.08); }
+  .pill-subtasks { color: #888; }
+  .pill-priority-urgent { color: #ff4d4d; background: rgba(255,77,77,0.1); }
+  .pill-priority-high { color: #e8a020; background: rgba(232,160,32,0.1); }
+  .title { font-size: 14px; font-weight: 600; color: #e8e8e8; line-height: 1.3; }
+  .preview { font-size: 12px; color: #666; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .empty { visibility: hidden; }
+
+  /* OPTION A: Two-Row */
+  .a-card { height: 68px; display: flex; flex-direction: column; justify-content: center; }
+  .a-row1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+  .a-row1 .title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .a-row2 { display: flex; align-items: center; gap: 6px; height: 18px; }
+  .a-row2 .slot-folder { width: 70px; }
+  .a-row2 .slot-date { width: 76px; }
+  .a-row2 .slot-priority { width: 52px; }
+  .a-row2 .slot-assignee { width: 48px; }
+  .a-row2 .slot-subtasks { width: 60px; }
+
+  /* OPTION B: Three-Row */
+  .b-card { height: 88px; display: flex; flex-direction: column; justify-content: center; }
+  .b-row1 { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .b-row1 .title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .b-row2 { margin-bottom: 6px; height: 16px; }
+  .b-row3 { display: flex; align-items: center; gap: 6px; height: 18px; }
+  .b-row3 .slot-status { width: 72px; }
+  .b-row3 .slot-folder { width: 70px; }
+  .b-row3 .slot-date { width: 76px; }
+  .b-row3 .slot-priority { width: 52px; }
+  .b-row3 .slot-assignee { width: 48px; }
+  .b-row3 .slot-subtasks { width: 60px; }
+
+  /* OPTION C: Grid */
+  .c-card { height: 96px; display: flex; flex-direction: column; justify-content: center; }
+  .c-row1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .c-row1 .title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c-row2 { margin-bottom: 6px; height: 16px; }
+  .c-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 2px 12px; height: 36px; align-content: center;
+  }
+  .c-grid-item { font-size: 10px; color: #666; display: flex; align-items: center; gap: 4px; height: 16px; }
+  .c-grid-item .label { color: #444; width: 48px; text-transform: uppercase; font-size: 9px; letter-spacing: 0.3px; }
+  .c-grid-item .value { color: #888; }
+  .c-grid-item .value.teal { color: #00E4E4; }
+  .c-grid-item .value.urgent { color: #ff4d4d; }
+  .c-grid-item .value.high { color: #e8a020; }
+
+  .note-box {
+    margin-top: 40px; padding: 16px; border-radius: 6px;
+    background: rgba(0,228,228,0.04); border: 1px solid rgba(0,228,228,0.1);
+    color: #888; font-size: 12px; line-height: 1.6; max-width: 1000px;
+  }
+  .note-box strong { color: #00E4E4; }
+</style>
+</head>
+<body>
+<h1>Card Design Options — Wide State (480px)</h1>
+<p class="subtitle">Editor closed. Three design directions, each showing 4 example cards with varying metadata density.</p>
+<div class="options">
+
+<!-- OPTION A -->
+<div class="option">
+  <div class="option-label">Option A — Two-Row</div>
+  <div class="option-desc">Row 1: title + status badge. Row 2: metadata pills in fixed slots. Most compact.</div>
+  <div class="card-list">
+    <div class="card a-card">
+      <div class="a-row1"><span class="title">Project Planning Document</span><span class="badge badge-todo">todo</span></div>
+      <div class="a-row2">
+        <span class="slot-folder"><span class="pill pill-folder">Cabinet</span></span>
+        <span class="slot-date"><span class="pill pill-date">2026-04-02</span></span>
+        <span class="slot-priority"><span class="pill pill-priority-high">high</span></span>
+        <span class="slot-assignee"><span class="pill pill-assignee">Matt</span></span>
+        <span class="slot-subtasks"><span class="pill pill-subtasks">2 subtasks</span></span>
+      </div>
+    </div>
+    <div class="card a-card">
+      <div class="a-row1"><span class="title">Meeting Notes from Tuesday</span><span class="badge empty">todo</span></div>
+      <div class="a-row2">
+        <span class="slot-folder"><span class="pill pill-folder">Cabinet</span></span>
+        <span class="slot-date"><span class="pill empty">2026-04-02</span></span>
+        <span class="slot-priority"><span class="pill empty">high</span></span>
+        <span class="slot-assignee"><span class="pill empty">Matt</span></span>
+        <span class="slot-subtasks"><span class="pill empty">2 subtasks</span></span>
+      </div>
+    </div>
+    <div class="card a-card">
+      <div class="a-row1"><span class="title">Fix Authentication Bug</span><span class="badge badge-inprogress">in progress</span></div>
+      <div class="a-row2">
+        <span class="slot-folder"><span class="pill empty">Cabinet</span></span>
+        <span class="slot-date"><span class="pill pill-date">2026-04-02</span></span>
+        <span class="slot-priority"><span class="pill pill-priority-urgent">urgent</span></span>
+        <span class="slot-assignee"><span class="pill empty">Matt</span></span>
+        <span class="slot-subtasks"><span class="pill empty">2 subtasks</span></span>
+      </div>
+    </div>
+    <div class="card a-card">
+      <div class="a-row1"><span class="title">Untitled Note</span><span class="badge empty">todo</span></div>
+      <div class="a-row2">
+        <span class="slot-folder"><span class="pill empty">Cabinet</span></span>
+        <span class="slot-date"><span class="pill empty">2026-04-02</span></span>
+        <span class="slot-priority"><span class="pill empty">high</span></span>
+        <span class="slot-assignee"><span class="pill empty">Matt</span></span>
+        <span class="slot-subtasks"><span class="pill empty">2 subtasks</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OPTION B -->
+<div class="option">
+  <div class="option-label">Option B — Three-Row</div>
+  <div class="option-desc">Row 1: title. Row 2: preview text. Row 3: full metadata strip. Room to breathe.</div>
+  <div class="card-list">
+    <div class="card b-card">
+      <div class="b-row1"><span class="title">Project Planning Document</span></div>
+      <div class="b-row2"><span class="preview">Review the quarterly milestones and update timeline...</span></div>
+      <div class="b-row3">
+        <span class="slot-status"><span class="badge badge-todo">todo</span></span>
+        <span class="slot-folder"><span class="pill pill-folder">Cabinet</span></span>
+        <span class="slot-date"><span class="pill pill-date">2026-04-02</span></span>
+        <span class="slot-priority"><span class="pill pill-priority-high">high</span></span>
+        <span class="slot-assignee"><span class="pill pill-assignee">Matt</span></span>
+        <span class="slot-subtasks"><span class="pill pill-subtasks">2 subtasks</span></span>
+      </div>
+    </div>
+    <div class="card b-card">
+      <div class="b-row1"><span class="title">Meeting Notes from Tuesday</span></div>
+      <div class="b-row2"><span class="preview">Discussed launch timeline and resource allocation...</span></div>
+      <div class="b-row3">
+        <span class="slot-status"><span class="badge empty">todo</span></span>
+        <span class="slot-folder"><span class="pill pill-folder">Cabinet</span></span>
+        <span class="slot-date"><span class="pill empty">2026-04-02</span></span>
+        <span class="slot-priority"><span class="pill empty">high</span></span>
+        <span class="slot-assignee"><span class="pill empty">Matt</span></span>
+        <span class="slot-subtasks"><span class="pill empty">2 subtasks</span></span>
+      </div>
+    </div>
+    <div class="card b-card">
+      <div class="b-row1"><span class="title">Fix Authentication Bug</span></div>
+      <div class="b-row2"><span class="preview empty">placeholder</span></div>
+      <div class="b-row3">
+        <span class="slot-status"><span class="badge badge-inprogress">in progress</span></span>
+        <span class="slot-folder"><span class="pill empty">Cabinet</span></span>
+        <span class="slot-date"><span class="pill pill-date">2026-04-02</span></span>
+        <span class="slot-priority"><span class="pill pill-priority-urgent">urgent</span></span>
+        <span class="slot-assignee"><span class="pill empty">Matt</span></span>
+        <span class="slot-subtasks"><span class="pill empty">2 subtasks</span></span>
+      </div>
+    </div>
+    <div class="card b-card">
+      <div class="b-row1"><span class="title">Untitled Note</span></div>
+      <div class="b-row2"><span class="preview empty">placeholder</span></div>
+      <div class="b-row3">
+        <span class="slot-status"><span class="badge empty">todo</span></span>
+        <span class="slot-folder"><span class="pill empty">Cabinet</span></span>
+        <span class="slot-date"><span class="pill empty">2026-04-02</span></span>
+        <span class="slot-priority"><span class="pill empty">high</span></span>
+        <span class="slot-assignee"><span class="pill empty">Matt</span></span>
+        <span class="slot-subtasks"><span class="pill empty">2 subtasks</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OPTION C -->
+<div class="option">
+  <div class="option-label">Option C — Grid</div>
+  <div class="option-desc">Row 1: title + status. Row 2: preview. Below: labeled 2-column metadata grid. Most structured.</div>
+  <div class="card-list">
+    <div class="card c-card">
+      <div class="c-row1"><span class="title">Project Planning Document</span><span class="badge badge-todo">todo</span></div>
+      <div class="c-row2"><span class="preview">Review the quarterly milestones and update timeline...</span></div>
+      <div class="c-grid">
+        <div class="c-grid-item"><span class="label">Folder</span><span class="value">Cabinet</span></div>
+        <div class="c-grid-item"><span class="label">Due</span><span class="value">2026-04-02</span></div>
+        <div class="c-grid-item"><span class="label">Priority</span><span class="value high">high</span></div>
+        <div class="c-grid-item"><span class="label">Assign</span><span class="value teal">Matt</span></div>
+      </div>
+    </div>
+    <div class="card c-card">
+      <div class="c-row1"><span class="title">Meeting Notes from Tuesday</span><span class="badge empty">todo</span></div>
+      <div class="c-row2"><span class="preview">Discussed launch timeline and resource allocation...</span></div>
+      <div class="c-grid">
+        <div class="c-grid-item"><span class="label">Folder</span><span class="value">Cabinet</span></div>
+        <div class="c-grid-item"><span class="label empty">Due</span><span class="value empty">-</span></div>
+        <div class="c-grid-item"><span class="label empty">Priority</span><span class="value empty">-</span></div>
+        <div class="c-grid-item"><span class="label empty">Assign</span><span class="value empty">-</span></div>
+      </div>
+    </div>
+    <div class="card c-card">
+      <div class="c-row1"><span class="title">Fix Authentication Bug</span><span class="badge badge-inprogress">in progress</span></div>
+      <div class="c-row2"><span class="preview empty">placeholder</span></div>
+      <div class="c-grid">
+        <div class="c-grid-item"><span class="label empty">Folder</span><span class="value empty">-</span></div>
+        <div class="c-grid-item"><span class="label">Due</span><span class="value">2026-04-02</span></div>
+        <div class="c-grid-item"><span class="label">Priority</span><span class="value urgent">urgent</span></div>
+        <div class="c-grid-item"><span class="label empty">Assign</span><span class="value empty">-</span></div>
+      </div>
+    </div>
+    <div class="card c-card">
+      <div class="c-row1"><span class="title">Untitled Note</span><span class="badge empty">todo</span></div>
+      <div class="c-row2"><span class="preview empty">placeholder</span></div>
+      <div class="c-grid">
+        <div class="c-grid-item"><span class="label empty">Folder</span><span class="value empty">-</span></div>
+        <div class="c-grid-item"><span class="label empty">Due</span><span class="value empty">-</span></div>
+        <div class="c-grid-item"><span class="label empty">Priority</span><span class="value empty">-</span></div>
+        <div class="c-grid-item"><span class="label empty">Assign</span><span class="value empty">-</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="note-box">
+  <strong>Design Notes:</strong><br>
+  - Fixed card heights per option (A: 68px, B: 88px, C: 96px). Empty metadata uses visibility:hidden to reserve space.<br>
+  - Option A: Most compact, best for density. Status badge in title row, everything else in pill strip.<br>
+  - Option B: Preview text gets dedicated row. Status moves to metadata strip. Best for content-heavy notes.<br>
+  - Option C: Labeled grid gives structure. Best for metadata-heavy workflows. Subtask count could be added as 3rd grid row.<br>
+  - Hover: slight background brighten. Selected state (not shown): teal left border accent.
+</div>
+</body>
+</html>

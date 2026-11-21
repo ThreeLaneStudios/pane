@@ -1,0 +1,29 @@
+name: CI — Gateway Version Gate
+
+# #3120 PR 4 (pre-existing): this workflow targeted `branches: [prod]` from when
+# `prod` was the active release branch (added 2026-08-11, ci(release): publish
+# gateway for macOS and Linux). The repo has since moved to `main` as the
+# default/dev branch (every other PR-gating workflow — reed-gate, spec-first,
+# section-4-enforcement, startup-smoke, dmg-swap-test, skill-sync-gate — targets
+# `branches: [main]`) but this one was never updated, so it has never actually
+# triggered on a PR against `main`: every PR in this repo's current flow targets
+# `main`, meaning "any PR touching src-gateway/ requires a version bump" has been
+# silently unenforced since the branch-model switch. `scripts/check-gateway-
+# version-bump.sh` itself is unaffected and correct (confirmed via a direct run
+# against a synthetic src-gateway/ diff) — the defect is this trigger target.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  gateway-version-bump:
+    name: Gateway changes require a version bump
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check gateway version increased when gateway changed
+        run: bash scripts/check-gateway-version-bump.sh "origin/${{ github.base_ref }}"

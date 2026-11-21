@@ -1,0 +1,170 @@
+name: CI — Dependency Audit Gate
+
+# Refs #3106 (4.5 scope: dependency-audit gate). Blocking: cargo-audit
+# (RustSec) over src-tauri/ and src-gateway/, pnpm audit --audit-level=high
+# over the frontend, npm audit --audit-level=high over tools/enex-import
+# (#3217, its own standalone package-lock.json, scanned from here on).
+# Every remaining finding must be listed in
+# docs/security/dependency-audit-exceptions.yml with a reason and a
+# review_by date — scripts/check-dependency-exceptions.sh is what makes an
+# expired entry actually fail the job instead of silently sitting there.
+#
+# No path filter, deliberately — same reasoning ci.yml/rust-tests.yml
+# already use for their own PR-side triggers ("must always report status"):
+# a newly-disclosed advisory against an UNCHANGED lockfile must still be
+# catchable, which is exactly what the weekly `schedule` trigger below is
+# for. A path filter here would reproduce the exact gap
+# check-version-parity.sh's own comment calls out and rejects for a
+# different file.
+#
+# GitHub-hosted only (ubuntu-latest) — deliberately. Putting a new
+# PR-triggered job on the self-hosted macOS runner would reopen the exact
+# #3106 C1 class of risk (self-hosted + pull_request-reachable) this whole
+# issue thread exists to close. cargo-audit/pnpm audit need no macOS-specific
+# behavior.
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, independent of any PR activity — this is what catches a
+    # manifest entry going stale on a quiet week when nobody happens to
+    # touch a file that would otherwise retrigger the PR-side check.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  manifest-expiry:
+    name: Exception manifest — expiry check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PyYAML
+        run: pip install --quiet pyyaml
+
+      - name: Check every exception entry's review_by date
+        run: bash scripts/check-dependency-exceptions.sh expiry
+
+  cargo-audit-tauri:
+    name: cargo-audit — src-tauri
+    needs: [manifest-expiry]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install PyYAML
+        run: pip install --quiet pyyaml
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: cargo-audit (manifest-filtered)
+        run: bash scripts/check-dependency-exceptions.sh cargo cargo-tauri src-tauri
+
+  cargo-audit-gateway:
+    name: cargo-audit — src-gateway
+    needs: [manifest-expiry]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-gateway
+
+      - name: Install PyYAML
+        run: pip install --quiet pyyaml
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: cargo-audit (manifest-filtered)
+        run: bash scripts/check-dependency-exceptions.sh cargo cargo-gateway src-gateway
+
+  pnpm-audit:
+    name: pnpm audit — frontend
+    needs: [manifest-expiry]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.29.2
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install PyYAML
+        run: pip install --quiet pyyaml
+
+      - name: pnpm audit (manifest-filtered, high+ only — NOT --prod, see manifest header)
+        run: bash scripts/check-dependency-exceptions.sh pnpm
+
+  npm-audit-enex-import:
+    name: npm audit (tools/enex-import)
+    needs: [manifest-expiry]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+
+      - name: Install enex-import dependencies
+        working-directory: tools/enex-import
+        run: npm ci
+
+      - name: Install PyYAML
+        run: pip install --quiet pyyaml
+
+      - name: npm audit (manifest-filtered, high+ only)
+        run: bash scripts/check-dependency-exceptions.sh npm npm-enex-import tools/enex-import
+
+  dependency-audit-report:
+    # Non-blocking report step, scheduled run only: surfaces cargo-audit's
+    # own warning categories (unmaintained/unsound/yanked) so a currently
+    # "fine to not block on" warning doesn't quietly age into something that
+    # should have been acted on. Does not affect this workflow's pass/fail —
+    # cargo-audit's exit code only reflects vulnerabilities, not warnings,
+    # and that's intentional (see dependency-audit-exceptions.yml's header
+    # for why blocking on warnings would force low-confidence ignore-list
+    # bloat right next to the entries that matter).
+    name: Weekly warnings report (non-blocking)
+    if: github.event_name == 'schedule'
+    needs: [cargo-audit-tauri, cargo-audit-gateway]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Report warnings (src-tauri) — non-blocking
+        working-directory: src-tauri
+        run: cargo audit || true
+
+      - name: Report warnings (src-gateway) — non-blocking
+        working-directory: src-gateway
+        run: cargo audit || true

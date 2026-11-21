@@ -1,0 +1,103 @@
+name: CI — Startup Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    # No paths-ignore — workflow must always trigger so required-status checks report
+
+jobs:
+  smoke-fresh-db:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Check if only docs changed
+        id: docs-only
+        run: |
+          # Get list of changed files vs base branch
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+          # Check if ALL changed files match docs patterns
+          NON_DOCS=$(echo "$CHANGED" | grep -v -E '^docs/|\.md$|^\.github/ISSUE_TEMPLATE/' || true)
+          if [ -z "$NON_DOCS" ]; then
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Only docs changed — skipping smoke test"
+          else
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "Non-docs files changed:"
+            echo "$NON_DOCS"
+          fi
+
+      - name: Build Tauri app (debug)
+        if: steps.docs-only.outputs.docs_only != 'true'
+        working-directory: src-tauri
+        run: cargo build --bin pane
+
+      - name: Run smoke harness — fresh DB
+        if: steps.docs-only.outputs.docs_only != 'true'
+        run: ./scripts/smoke-launch.sh fresh
+
+      - name: Grep stderr for severity patterns
+        if: steps.docs-only.outputs.docs_only != 'true'
+        run: ./scripts/smoke-grep.sh /tmp/smoke-stderr-fresh.log
+
+  smoke-upgrade-db:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Check if only docs changed
+        id: docs-only
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+          NON_DOCS=$(echo "$CHANGED" | grep -v -E '^docs/|\.md$|^\.github/ISSUE_TEMPLATE/' || true)
+          if [ -z "$NON_DOCS" ]; then
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Only docs changed — skipping smoke test"
+          else
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "Non-docs files changed:"
+            echo "$NON_DOCS"
+          fi
+
+      - name: Build Tauri app (debug)
+        if: steps.docs-only.outputs.docs_only != 'true'
+        working-directory: src-tauri
+        run: cargo build --bin pane
+
+      - name: Verify upgrade fixture is current
+        if: steps.docs-only.outputs.docs_only != 'true'
+        run: ./scripts/verify-upgrade-fixture.sh
+
+      - name: Run smoke harness — upgrade DB
+        if: steps.docs-only.outputs.docs_only != 'true'
+        run: ./scripts/smoke-launch.sh upgrade
+
+      - name: Grep stderr for severity patterns
+        if: steps.docs-only.outputs.docs_only != 'true'
+        run: ./scripts/smoke-grep.sh /tmp/smoke-stderr-upgrade.log

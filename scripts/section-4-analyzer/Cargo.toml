@@ -1,0 +1,18 @@
+[package]
+name = "section-4-analyzer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+syn = { version = "2", features = ["full", "visit"] }
+# #3059: `turn_origin.rs` reads `Span::start().line` for violation reporting
+# — needs `proc-macro2` directly in scope (it's already a transitive dep of
+# `syn`; this just names it so `turn_origin.rs` can reference it by path).
+# `span-locations` is required for `Span::start()` to return real line/column
+# info outside of an actual proc-macro invocation (this binary is a plain
+# CLI, not a proc-macro, so it uses proc-macro2's fallback Span, which only
+# tracks source locations when this feature is on).
+proc-macro2 = { version = "1", features = ["span-locations"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"

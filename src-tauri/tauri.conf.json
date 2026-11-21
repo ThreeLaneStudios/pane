@@ -1,0 +1,80 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Pane",
+  "version": "1.0.86",
+  "identifier": "com.threelane.pane",
+  "build": {
+    "frontendDist": "../build",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "npx vite build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Pane",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: https://asset.localhost blob: data: https://img.youtube.com; media-src 'self' asset: https://asset.localhost blob: data:; object-src 'self' asset: https://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self'; base-uri 'none'; form-action 'none'",
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ipc: http://ipc.localhost http://localhost:5173 ws://localhost:5173; img-src 'self' asset: https://asset.localhost blob: data: https://img.youtube.com; media-src 'self' asset: https://asset.localhost blob: data:; object-src 'self' asset: https://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self'; base-uri 'none'; form-action 'none'",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$HOME/Pane/Projects/*/Assets/**",
+          "$HOME/Pane/.pane/attachments/**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "resources": [
+      "resources/crsqlite.dylib",
+      "resources/crsqlite.so"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/64x64.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/256x256.png",
+      "icons/icon-linux.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "createUpdaterArtifacts": true,
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "11.0",
+      "exceptionDomain": "",
+      "signingIdentity": "Developer ID Application: Matthew Carano (FL493VAUAL)",
+      "providerShortName": null,
+      "entitlements": null
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDA5RjMyQUM4ODA1MUNBREQKUldUZHlsR0F5Q3J6Q2YxNDlqVHZ3MHBZOHNPR2lObC9ydFA0bU5LM1JZZ09MU29Bc3RyM084cSsK",
+      "endpoints": [
+        "https://updates.paneapp.ai/latest.json"
+      ]
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "pane"
+        ]
+      }
+    }
+  }
+}

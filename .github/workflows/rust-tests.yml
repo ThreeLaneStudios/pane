@@ -1,0 +1,147 @@
+name: CI — Rust Tests (macOS)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src-tauri/src/**'
+      - 'src-tauri/tests/**'
+      - 'src-tauri/build.rs'
+      - '.github/workflows/rust-tests.yml'
+  pull_request:
+    branches: [main]
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: read
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            rust:
+              - 'src-tauri/src/**'
+              - 'src-tauri/tests/**'
+              - 'src-tauri/build.rs'
+              - 'src-tauri/Cargo.lock'
+              - '.github/workflows/rust-tests.yml'
+
+  rust-tests:
+    needs: [changes]
+    # #2291: `changes` only runs on pull_request (line 17 `if:`), so on push it is
+    # always `skipped`. Without an explicit status-check function here, GitHub's
+    # implicit `success()` gate on `needs:` cascade-skips this job on every push
+    # to main (144/144 runs since PR #652, per Reed's 2026-07-29 audit). The
+    # explicit `always()` + `needs.changes.result != 'failure'` combo runs this
+    # job on push regardless of `changes` being skipped, while still honoring a
+    # genuine `changes` job failure and the PR-side path-filter skip.
+    if: |
+      always() &&
+      (github.event_name == 'push' || needs.changes.outputs.rust == 'true') &&
+      needs.changes.result != 'failure'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test --lib -- --test-threads=1
+      
+      - name: Schema version vs migration test gate (#2030)
+        run: |
+          # CI gate: if SCHEMA_VERSION >= "76", the v76 migration tests must NOT have #[ignore]
+          # This prevents bumping SCHEMA_VERSION without un-ignoring the corresponding tests.
+          SCHEMA_VER=$(grep -m1 'const SCHEMA_VERSION' src-tauri/src/migrations.rs | grep -oE '"[0-9]+"' | tr -d '"')
+          if [ -n "$SCHEMA_VER" ] && [ "$SCHEMA_VER" -ge 76 ] 2>/dev/null; then
+            if grep -B3 'fn test_fresh_install_v76\|fn test_v75_to_v76_migration\|fn test_v75_to_v76_data_preservation' src-tauri/src/migration_tests.rs | grep -q '#\[ignore\]'; then
+              echo "\u274c GATE FAIL: v76 migration tests have #[ignore] but SCHEMA_VERSION=$SCHEMA_VER"
+              exit 1
+            fi
+            echo "\u2705 Schema gate: SCHEMA_VERSION=$SCHEMA_VER and v76 tests are not ignored"
+          else
+            echo "\u2139\ufe0f  Schema gate: SCHEMA_VERSION=$SCHEMA_VER (< 76), skipping v76 test check"
+          fi
+
+      - name: Architecture integrity check
+        run: |
+          echo "Checking architecture invariants..."
+          if grep -rn '"Pane System"' src-tauri/src/ --include="*.rs" | grep -v "// " | grep -v "migration" | grep -v "DELETE" | grep -v "#\[test\]" | grep -v "mod tests" | grep -v "fn test_" | grep -v "_tests\.rs"; then
+            echo "❌ INVARIANT VIOLATION: 'Pane System' found as project reference"
+            exit 1
+          fi
+          if grep -rn 'verify_system_notes_integrity' src-tauri/src/ --include="*.rs" | grep -v 'legacy-ok' | grep -v 'legacy' | grep -v '_tests\.rs' | grep -v 'fn test_'; then
+            echo "❌ INVARIANT VIOLATION: verify_system_notes_integrity without guard"
+            exit 1
+          fi
+          echo "✅ Architecture invariants passed"
+
+      # #2291 red-main alert: rust-tests failing on a push to main means broken
+      # tests already landed on main (post-merge, e.g. via an admin bypass per
+      # Reed's audit Bug 1). Notify Discord so this doesn't sit unnoticed the
+      # way it did for #2278. Requires repo secret DISCORD_CI_WEBHOOK_URL
+      # (added by Matt after this PR merges; step is a no-op until then).
+      - name: Red-main alert (Discord)
+        if: failure() && github.event_name == 'push'
+        env:
+          DISCORD_CI_WEBHOOK_URL: ${{ secrets.DISCORD_CI_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_CI_WEBHOOK_URL" ]; then
+            echo "⚠️  DISCORD_CI_WEBHOOK_URL secret not set — skipping red-main Discord alert."
+            echo "    (Expected until Matt adds the secret post-merge of #2291.)"
+            exit 0
+          fi
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          curl -sS -X POST "$DISCORD_CI_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOF
+          {
+            "embeds": [{
+              "title": "🔴 rust-tests failed on main (push)",
+              "description": "Broken tests landed on \`main\`. Investigate immediately.",
+              "color": 15158332,
+              "url": "${RUN_URL}",
+              "fields": [
+                { "name": "Commit", "value": "${GITHUB_SHA}", "inline": true },
+                { "name": "Ref", "value": "${GITHUB_REF_NAME}", "inline": true },
+                { "name": "Run", "value": "${RUN_URL}" }
+              ]
+            }]
+          }
+          EOF
+
+  # #2291 skip-canary: guards against the exact cascade-skip regression this PR
+  # fixes ever silently returning. If `rust-tests` reports `skipped` on a push
+  # event to main, that means the push-side always()/needs cascade fix above
+  # has been reverted or broken again — fail loudly instead of letting it slide
+  # (this is what let the bug go unnoticed for 144 consecutive runs).
+  skip-canary:
+    needs: [rust-tests]
+    if: always() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if rust-tests skipped on push
+        run: |
+          RESULT="${{ needs.rust-tests.result }}"
+          echo "rust-tests result on push event: ${RESULT}"
+          if [ "$RESULT" = "skipped" ]; then
+            echo "❌ CANARY TRIP: rust-tests was SKIPPED on a push-to-main event."
+            echo "   This is the #2291 cascade-skip regression (needs:[changes] +"
+            echo "   implicit success() gate silently disabling this job on push)."
+            echo "   See .github/workflows/rust-tests.yml and Reed's 2026-07-29"
+            echo "   trigger-gap investigation (issue #2291) for full root cause."
+            exit 1
+          fi
+          echo "✅ Skip-canary OK: rust-tests concluded '${RESULT}' (not skipped) on push."

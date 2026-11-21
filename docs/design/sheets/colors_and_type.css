@@ -1,0 +1,177 @@
+/* =========================================================
+   Pane Design System — colors_and_type.css
+   Single source of truth for color + type tokens.
+   Import once into any HTML file:
+     <link rel="stylesheet" href="../colors_and_type.css">
+   ========================================================= */
+
+/* Inter substitution for SF Pro (see README) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* ---------- Color: surfaces ---------- */
+  --bg:           #0A0A0F;   /* canvas, near-black */
+  --surface-1:    #1A1A1C;   /* sidebar, cards, kanban columns */
+  --surface-2:    #232327;   /* inputs, hover wells */
+  --surface-3:    #2C2C30;   /* pressed / pop-over */
+  --overlay-hover: rgba(240,237,232,0.03);
+  --overlay-press: rgba(240,237,232,0.06);
+
+  /* ---------- Color: foreground ---------- */
+  --fg-1:         #F0EDE8;   /* titles, primary text — warm off-white */
+  --fg-2:         #C9C5BE;   /* body — fg-1 at ~80% */
+  --fg-3:         #A0A0A0;   /* muted, captions, ALL-CAPS section headers */
+  --fg-4:         #5A5A5E;   /* placeholder, disabled */
+  --fg-on-accent: #0A0A0F;   /* dark text used on top of cyan buttons */
+
+  /* ---------- Color: borders ---------- */
+  --border-faint:  rgba(240,237,232,0.06);
+  --border:        rgba(240,237,232,0.10);
+  --border-strong: rgba(240,237,232,0.16);
+
+  /* ---------- Color: accent (single accent system) ---------- */
+  --accent:        #00E4E4;
+  --accent-hover:  #14F0F0;
+  --accent-soft:   rgba(0,228,228,0.12);
+
+  /* ---------- Color: status ---------- */
+  --status-success: #22C55E;
+  --status-warning: #F59E0B;
+  --status-danger:  #EF4444;
+  --status-info:    #3B82F6;
+  --status-gold:    #F5B824;   /* favorited star */
+
+  /* Kanban column rail colors (left-edge stripe on active card) */
+  --kanban-cabinet:  #6B6B6B;  /* gray dot */
+  --kanban-todo:     #3B82F6;  /* blue */
+  --kanban-progress: #F59E0B;  /* amber */
+  --kanban-review:   #00E4E4;  /* cyan */
+  --kanban-done:     #22C55E;  /* green */
+
+  /* ---------- Type: families ---------- */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", ui-monospace, Menlo, monospace;
+
+  /* ---------- Type: scale ---------- */
+  --fs-display: 32px;   /* page title, very rare */
+  --fs-h1:      24px;
+  --fs-h2:      20px;
+  --fs-h3:      17px;
+  --fs-body:    15px;
+  --fs-small:   13px;
+  --fs-caption: 12px;
+  --fs-micro:   11px;   /* ALL-CAPS section headers, pills */
+
+  /* line heights */
+  --lh-tight: 1.25;  /* @kind font */
+  --lh-snug:  1.4;   /* @kind font */
+  --lh-body:  1.55;  /* @kind font */
+
+  /* weights */
+  --fw-regular:  400; /* @kind font */
+  --fw-medium:   500; /* @kind font */
+  --fw-semibold: 600; /* @kind font */
+  --fw-bold:     700; /* @kind font */
+
+  /* ---------- Spacing ---------- */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  32px;
+  --space-8:  48px;
+  --space-9:  64px;
+
+  /* ---------- Radii ---------- */
+  --radius-sm: 6px;   /* pills, chips */
+  --radius-md: 8px;   /* buttons, kanban cards, sidebar items */
+  --radius-lg: 12px;  /* settings cards, big surfaces */
+  --radius-xl: 16px;  /* (rare) modal */
+  --radius-pill: 999px;
+
+  /* ---------- Shadows ---------- */
+  --shadow-pop: 0 12px 32px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4);
+  --shadow-input-focus: 0 0 0 1px var(--accent);
+
+  /* ---------- Motion ---------- */
+  --ease: cubic-bezier(0.2, 0, 0.0, 1);  /* @kind other */
+  --dur-fast: 120ms;  /* @kind other */
+  --dur-norm: 180ms;  /* @kind other */
+  --dur-slow: 240ms;  /* @kind other */
+}
+
+/* ---------- Semantic element styles ---------- */
+
+html, body {
+  background: var(--bg);
+  color: var(--fg-2);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11","ss01";
+}
+
+h1, .h1 {
+  font-size: var(--fs-h1);
+  font-weight: var(--fw-bold);
+  color: var(--fg-1);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+h2, .h2 {
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semibold);
+  color: var(--fg-1);
+  line-height: var(--lh-snug);
+  letter-spacing: -0.005em;
+  margin: 0;
+}
+h3, .h3 {
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-semibold);
+  color: var(--fg-1);
+  line-height: var(--lh-snug);
+  margin: 0;
+}
+
+p, .p {
+  font-size: var(--fs-body);
+  color: var(--fg-2);
+  line-height: var(--lh-body);
+  margin: 0;
+}
+
+.caption, small {
+  font-size: var(--fs-caption);
+  color: var(--fg-3);
+}
+
+.eyebrow {       /* the ALL-CAPS section header pattern (e.g. "AI CONNECTION") */
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+code, .mono {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--fg-1);
+  background: var(--surface-2);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover { color: var(--accent-hover); }
+
+::placeholder { color: var(--fg-4); }
+::selection { background: var(--accent-soft); color: var(--fg-1); }

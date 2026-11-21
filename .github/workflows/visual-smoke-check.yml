@@ -1,0 +1,199 @@
+name: CI — Visual Smoke Check (Gate 4d)
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  visual-smoke-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Gate 4d requirement
+        run: |
+          # Get changed files in this PR
+          CHANGED=$(git diff --name-only origin/main...HEAD)
+          
+          # UI paths that trigger Gate 4d
+          UI_CHANGED=$(echo "$CHANGED" | grep -E '^(src/lib/components/.*\.(svelte|css|ts)|src/lib/stores/.*\.ts)$' || true)
+          
+          if [ -z "$UI_CHANGED" ]; then
+            echo "✅ No UI files changed — Gate 4d not required"
+            exit 0
+          fi
+          
+          echo "🔍 UI files changed:"
+          echo "$UI_CHANGED"
+          echo ""
+          
+          PR_BODY="$PR_BODY_ENV"
+          
+          # Check for 4d: PASS in PR body
+          PASS_MARKER=$(echo "$PR_BODY" | grep -iE '^[[:space:]]*4d:.*PASS' || true)
+          
+          # Check for 4d-skip in PR body
+          SKIP_MARKER=$(echo "$PR_BODY" | grep -iE '^[[:space:]]*4d-skip:' || true)
+          
+          # Check for 4d walkthrough section
+          WALKTHROUGH=$(echo "$PR_BODY" | grep -iE '^## 4d walkthrough' || true)
+          
+          NEEDS_COMMENT=""
+          COMMENT_BODY=""
+          
+          if [ -n "$PASS_MARKER" ]; then
+            if [ -z "$WALKTHROUGH" ]; then
+              # PASS found but no walkthrough section — post warning, still exit 0
+              EXISTING_COMMENTS=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments --paginate -q '.[] | select(.body | contains("Gate 4d")) | .id' 2>/dev/null || true)
+              for cid in $EXISTING_COMMENTS; do
+                gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments/$cid -X DELETE 2>/dev/null || true
+              done
+              WARN_BODY="⚠️ Gate 4d: PASS recorded without walkthrough section. Walkthroughs are required per playbook §5 for auditability.\n\nUI files changed:\n\`\`\`\n$UI_CHANGED\n\`\`\`"
+              echo -e "$WARN_BODY" | gh pr comment ${{ github.event.pull_request.number }} --body-file -
+              echo "⚠️ Gate 4d: PASS without walkthrough — warning posted"
+            else
+              echo "✅ Gate 4d: PASS with walkthrough — all good"
+            fi
+            exit 0
+          fi
+          
+          if [ -n "$SKIP_MARKER" ]; then
+            SKIP_REASON=$(echo "$PR_BODY" | sed -n '/^[[:space:]]*4d-skip:/,/^$/{ s/.*4d-skip:[[:space:]]*//; /^$/d; p; }' | tr '\n' ' ' | sed 's/ *$//')
+            REASON_LEN=${#SKIP_REASON}
+            if [ "$REASON_LEN" -lt 40 ]; then
+              COMMENT_BODY="⚠️ **Gate 4d skip justification too short** ($REASON_LEN chars, minimum 40).\n\nSkip reason: $SKIP_REASON\n\nUI files changed:\n\`\`\`\n$UI_CHANGED\n\`\`\`"
+              NEEDS_COMMENT="true"
+            else
+              # Valid skip — post visible warning comment
+              COMMENT_BODY="⚠️ **Gate 4d (Fresh-Install Visual Smoke) skipped.**\n\nReason: $SKIP_REASON\n\nUI files changed:\n\`\`\`\n$UI_CHANGED\n\`\`\`\n\nSkips are audit-trailed. If this PR introduces a visual regression, this skip is the root cause."
+              NEEDS_COMMENT="true"
+            fi
+          else
+            # No pass, no skip — needs attention
+            MISSING_ITEMS=""
+            if [ -z "$WALKTHROUGH" ]; then
+              MISSING_ITEMS="${MISSING_ITEMS}\n- [ ] Add \`## 4d walkthrough\` section listing screens/interactions to verify"
+            fi
+            MISSING_ITEMS="${MISSING_ITEMS}\n- [ ] After fresh-install smoke test, add \`4d: PASS\` to PR description"
+            MISSING_ITEMS="${MISSING_ITEMS}\n- [ ] Or add \`4d-skip: [reason, 40+ chars]\` if not applicable"
+            
+            COMMENT_BODY="📋 **Gate 4d: Fresh-Install Visual Smoke required.**\n\nThis PR touches UI files:\n\`\`\`\n$UI_CHANGED\n\`\`\`\n\n**To satisfy Gate 4d:**$MISSING_ITEMS\n\n**What Gate 4d catches:** State timing races, CSS positioning bugs, and component lifecycle issues that code review and CI miss. See playbook §5 Gate 4d.\n\n*This is an audit comment, not a merge blocker.*"
+            NEEDS_COMMENT="true"
+          fi
+          
+          if [ "$NEEDS_COMMENT" = "true" ]; then
+            # Delete any previous Gate 4d comments to avoid spam
+            EXISTING_COMMENTS=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments --paginate -q '.[] | select(.body | contains("Gate 4d")) | .id' 2>/dev/null || true)
+            for cid in $EXISTING_COMMENTS; do
+              gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments/$cid -X DELETE 2>/dev/null || true
+            done
+            
+            # Post new comment
+            echo -e "$COMMENT_BODY" | gh pr comment ${{ github.event.pull_request.number }} --body-file -
+            echo ""
+            echo "📋 Gate 4d comment posted on PR"
+          fi
+          
+          # Always exit 0 — this is a comment gate, not a merge blocker
+          exit 0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BODY_ENV: ${{ github.event.pull_request.body }}
+
+  # #3190 (C65 final): the job above is a pure PR-body text-marker check
+  # (grep for `4d: PASS`/`4d-skip:`) — it has never run a browser or
+  # asserted a pixel. This job adds that: the six-screenshot sidebar
+  # overlay regression spec (tests/e2e/c65-sidebar-overlay-visual.spec.ts),
+  # run via Playwright's own `toHaveScreenshot()` against committed
+  # baselines, which natively fails distinctly on a MISSING baseline
+  # ("no baseline to compare against") versus a DIFFERING one (pixel/byte
+  # diff) — a missing-baseline run is never read as a pass. Alongside,
+  # not replacing, the text-marker job above. Vite + Playwright WebKit
+  # with mocked IPC only (#3179) — never the real app binary, never
+  # `cargo run`, never src-tauri/.
+  sidebar-overlay-visual-regression:
+    # #3191 correction (C65, pass 2): was ubuntu-latest. The six committed
+    # baselines are Playwright's own OS-suffixed `-webkit-darwin.png`
+    # filenames (no `snapshotPathTemplate` override anywhere in
+    # playwright.config.ts, confirmed by grep) — on Linux, Playwright looks
+    # for `-webkit-linux.png`, finds nothing, and every assertion reports
+    # "missing baseline," not a pixel diff, every run, permanently. Matt's
+    # ruling: baselines stay `-webkit-darwin` (Pane ships WebKit on macOS;
+    # Linux WebKit renders differently, so Linux baselines would test a
+    # product this app isn't), and this job moves to GitHub-hosted
+    # `macos-latest` — specifically NOT `[self-hosted, macOS, ARM64]` (used
+    # elsewhere in this repo by e2e.yml/nightly-tests.yml/startup-smoke.yml/
+    # section-4-enforcement.yml): #3106's checklist bars self-hosted runners
+    # on `pull_request` once the repo is public.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          # #3191 correction (C65, pass 2 follow-up): was '26', matching
+          # every other Node job in this repo. On THIS job specifically —
+          # GitHub-hosted macos-latest (arm64) running `playwright
+          # install` — Node 26 hangs indefinitely after the browser
+          # download reaches 100%, never printing a completion line and
+          # never exiting. Reproduced here: the "Install Playwright
+          # WebKit" step sat `in_progress` for 18+ minutes with no further
+          # output before this fix, on a run that otherwise reached that
+          # step in under 30 seconds. Matches a known upstream Node/
+          # Playwright interaction on macOS arm64 (microsoft/playwright
+          # #41092 — "playwright install hangs after download on macOS
+          # arm64" under Node 24.16+, confirmed fixed by downgrading to
+          # Node 22 LTS) — not specific to this repo's code and not a
+          # rendering difference; this job's own earlier ubuntu-latest run
+          # (before correction 2 above) never hit this hang at Node '26',
+          # consistent with the upstream report being macOS-arm64-specific.
+          # '22' already has precedent in this repo (release-publish.yml,
+          # updater-release-assets.yml) — scoped to this one job only, not
+          # a repo-wide Node downgrade.
+          node-version: '22'
+
+      # #3191 correction (C65, pass 2 follow-up): missing on this job even
+      # before correction 2 (it ran `npm ci`, not `pnpm install`, for its
+      # own deps — pnpm was never needed until test time). Confirmed live
+      # on macos-latest: `playwright.config.ts`'s `webServer.command` is
+      # hardcoded `pnpm dev` — with no pnpm on PATH, the dev server Playwright
+      # needs to boot exits immediately (`/bin/sh: pnpm: command not found`,
+      # exit code 127), failing the whole run before a single screenshot is
+      # taken. Every OTHER workflow in this repo that needs pnpm at runtime
+      # (ci.yml, nightly-tests.yml, release-publish.yml,
+      # updater-release-assets.yml) installs it explicitly rather than
+      # relying on a runner image shipping it — same pattern, same pinned
+      # version, here.
+      #
+      # #3106: moved ABOVE "Install frontend dependencies" — that step now
+      # runs `pnpm install --frozen-lockfile` (matching every other
+      # workflow in this repo), which requires pnpm to already be on PATH.
+      - name: "Install pnpm (for webServer: pnpm dev)"
+        run: npm install -g pnpm@10.29.2
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright WebKit
+        run: npx playwright install --with-deps webkit
+
+      - name: Run sidebar overlay visual regression (WebKit)
+        run: npx playwright test c65-sidebar-overlay-visual.spec.ts --project=webkit
+
+      # `if: always()` so a failing run's actual/expected/diff triptych
+      # (and the missing-baseline case's "actual" image) is inspectable
+      # without re-running locally — same reasoning as #3182's own
+      # Playwright specs, just the first one with committed baselines.
+      - name: Upload Playwright report (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: c65-sidebar-overlay-visual-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

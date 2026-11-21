@@ -1,0 +1,87 @@
+name: CI — Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'tsconfig.json'
+      - 'svelte.config.js'
+      - 'vite.config.*'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main]
+    # No paths filter here — must always report status
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'src/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'tsconfig.json'
+              - 'svelte.config.js'
+              - 'vite.config.*'
+              - '.github/workflows/ci.yml'
+
+  test:
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        if: needs.changes.outputs.frontend == 'true'
+      
+      - name: Install Node
+        uses: actions/setup-node@v4
+        if: needs.changes.outputs.frontend == 'true'
+        with:
+          node-version: '26'
+      
+      - name: Install pnpm
+        if: needs.changes.outputs.frontend == 'true'
+        run: npm install -g pnpm@10.29.2
+      
+      - name: Install frontend dependencies
+        if: needs.changes.outputs.frontend == 'true'
+        run: pnpm install
+      
+      - name: Frontend tests
+        if: needs.changes.outputs.frontend == 'true'
+        run: npm run test
+      
+      - name: Svelte check
+        if: needs.changes.outputs.frontend == 'true'
+        run: npx svelte-check --tsconfig ./tsconfig.json || true
+      
+      - name: Skip — no frontend changes
+        if: needs.changes.outputs.frontend != 'true'
+        run: echo "No frontend changes — skipping frontend tests"
+
+  version-parity:
+    runs-on: ubuntu-latest
+    name: Version parity (package.json / Cargo.toml / tauri.conf.json)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check version parity
+        run: bash scripts/check-version-parity.sh
+
+  gateway-version-floor:
+    runs-on: ubuntu-latest
+    name: Gateway version vs MIN_GATEWAY_VERSION floor
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check gateway version floor
+        run: bash scripts/check-gateway-version-floor.sh
+        # §22C.11A.5 — Fails only if MIN_GATEWAY_VERSION is ahead of the
+        # actual gateway release. Release and compatibility versions are independent.

@@ -1,0 +1,104 @@
+name: CI — Reed Gate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  reed-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Reed Gate requirement
+        run: |
+          # Get changed files in this PR
+          CHANGED=$(git diff --name-only origin/main...HEAD)
+
+          # Core system paths that require Reed review
+          CORE_PATHS=(
+            "src-tauri/src/ai/"
+            "src-tauri/src/sync/"
+            "src-tauri/src/migrations.rs$"
+            "src-tauri/src/agents.rs$"
+            "src-tauri/src/database.rs$"
+            "src-tauri/src/notes.rs$"
+            "src-tauri/src/projects.rs$"
+            "src-tauri/src/system_files.rs$"
+            "src-tauri/src/sync_client.rs$"
+            "src-tauri/src/import.rs$"
+            "src-tauri/src/backup.rs$"
+            "src-tauri/src/watcher.rs$"
+            ".github/workflows/"
+            "src-gateway/"
+            "scripts/pre-build.sh$"
+            "scripts/build.sh$"
+            "scripts/smoke-launch.sh$"
+            "scripts/check-dependency-exceptions.sh$"
+            "docs/security/dependency-audit-exceptions.yml$"
+            "scripts/check-version-parity.sh$"
+            "scripts/check-spec-first.sh$"
+            "scripts/check-gateway-version-bump.sh$"
+            "scripts/build-crsqlite-universal.sh$"
+            "scripts/build-gateway-dmg.sh$"
+            "scripts/check-gateway-version-floor.sh$"
+            "scripts/check-no-native-confirm.sh$"
+            "scripts/check-release-source.sh$"
+            "scripts/ci-guards/run-guards.sh$"
+            "scripts/sign-dylibs.sh$"
+            "scripts/smoke-grep.sh$"
+            "scripts/spec-audit.sh$"
+            "scripts/verify-upgrade-fixture.sh$"
+          )
+
+          CORE_TOUCHED=""
+          for path in "${CORE_PATHS[@]}"; do
+            MATCH=$(echo "$CHANGED" | grep -E "^${path}" || true)
+            if [ -n "$MATCH" ]; then
+              CORE_TOUCHED="${CORE_TOUCHED}${MATCH}\n"
+            fi
+          done
+
+          if [ -z "$CORE_TOUCHED" ]; then
+            echo "✅ No core system files changed — Reed Gate not required"
+            exit 0
+          fi
+
+          echo "🔍 Core system files changed:"
+          echo -e "$CORE_TOUCHED"
+          echo ""
+
+          # Core paths require reed-reviewed label — no skip mechanism
+          HAS_LABEL=$(echo "$PR_LABELS_ENV" | grep -i 'reed-reviewed' || true)
+          if [ -z "$HAS_LABEL" ]; then
+            # Fallback: check via API in case label was added after event fired
+            LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+            HAS_LABEL=$(echo "$LABELS" | grep -i 'reed-reviewed' || true)
+          fi
+
+          if [ -n "$HAS_LABEL" ]; then
+            echo "✅ Reed Gate passed — 'reed-reviewed' label present"
+            exit 0
+          fi
+
+          echo ""
+          echo "❌ REED GATE VIOLATION"
+          echo ""
+          echo "This PR touches core system files that require Reed's architecture review:"
+          echo -e "$CORE_TOUCHED"
+          echo ""
+          echo "To pass this gate:"
+          echo "  1. Spawn Reed to review the PR diff"
+          echo "  2. Reed posts review comments on the PR"
+          echo "  3. Matt reads Reed's comments and applies the 'reed-reviewed' label"
+          echo ""
+          echo "There is no skip mechanism for core paths. Reed reviews the diff."
+          echo "See: #657 (reed-skip removed 2026-04-24)"
+          exit 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BODY_ENV: ${{ github.event.pull_request.body }}
+          PR_LABELS_ENV: ${{ join(github.event.pull_request.labels.*.name, '\n') }}

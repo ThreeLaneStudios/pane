@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export4.dtd">
+<en-export export-date="20260210T120000Z" application="Evernote" version="10.0">
+  <note>
+    <title>Welcome to Trove</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note>
+<h1>Welcome to Trove</h1>
+<p>This is a <b>test note</b> with <i>various</i> formatting.</p>
+<h2>Features</h2>
+<ul>
+<li>Bullet point one</li>
+<li>Bullet point two</li>
+<li>Bullet point three</li>
+</ul>
+<h3>A Checklist</h3>
+<div><en-todo checked="true"/>Buy milk</div>
+<div><en-todo checked="false"/>Write documentation</div>
+<div><en-todo checked="true"/>Ship the product</div>
+<h2>Code Example</h2>
+<pre><code>const trove = new Trove();
+trove.importNotes('evernote.enex');
+console.log('Done!');</code></pre>
+<p>Here is a <a href="https://example.com">link to example.com</a>.</p>
+<hr/>
+<p>And a horizontal rule above.</p>
+<blockquote>This is a blockquote with some wisdom.</blockquote>
+<h2>A Table</h2>
+<table>
+<tr><th>Feature</th><th>Status</th></tr>
+<tr><td>Editor</td><td>✅ Done</td></tr>
+<tr><td>Search</td><td>🔧 In Progress</td></tr>
+<tr><td>Import</td><td>📋 Planned</td></tr>
+</table>
+</en-note>]]></content>
+    <created>20260101T090000Z</created>
+    <updated>20260210T120000Z</updated>
+    <tag>welcome</tag>
+    <tag>getting-started</tag>
+    <note-attributes>
+      <source-url>https://trove.example.com</source-url>
+      <author>Matt</author>
+    </note-attributes>
+  </note>
+  <note>
+    <title>Meeting Notes - Product Sync</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note>
+<div>Meeting Notes from the weekly product sync.</div>
+<div><br/></div>
+<div><b>Attendees:</b> Matt, Stia, Reed</div>
+<div><br/></div>
+<div><b>Agenda:</b></div>
+<ol>
+<li>Review sprint progress</li>
+<li>Discuss ENEX import approach</li>
+<li>Plan next week's priorities</li>
+</ol>
+<div><br/></div>
+<div><b>Decisions:</b></div>
+<ul>
+<li>Use streaming XML parser for large archives</li>
+<li>Turndown for HTML→Markdown conversion</li>
+<li>Preserve all metadata in YAML frontmatter</li>
+</ul>
+<div><br/></div>
+<div><b>Action Items:</b></div>
+<div><en-todo checked="false"/>Build ENEX parser (Stia)</div>
+<div><en-todo checked="false"/>Write test cases (Reed)</div>
+<div><en-todo checked="true"/>Set up project structure (Matt)</div>
+</en-note>]]></content>
+    <created>20260208T140000Z</created>
+    <updated>20260208T153000Z</updated>
+    <tag>meetings</tag>
+    <tag>product</tag>
+    <tag>trove</tag>
+    <note-attributes>
+      <author>Matt</author>
+    </note-attributes>
+  </note>
+  <note>
+    <title>Quick Capture</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note>
+<div>Just a quick thought to capture before I forget.</div>
+<div><br/></div>
+<div>The import tool should handle edge cases gracefully:</div>
+<ul>
+<li>Empty notes</li>
+<li>Notes with only attachments</li>
+<li>Very long titles that need truncation</li>
+<li>Special characters in filenames: &amp; &lt; &gt; "quotes"</li>
+<li>Unicode: 你好世界 🌍</li>
+</ul>
+</en-note>]]></content>
+    <created>20260209T220000Z</created>
+    <tag>ideas</tag>
+  </note>
+  <note>
+    <title>Note with Image</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note>
+<div>Here is a note with an embedded image:</div>
+<div><br/></div>
+<en-media type="image/png" hash="89abcdef01234567890abcdef1234567"/>
+<div><br/></div>
+<div>And some text after the image.</div>
+</en-note>]]></content>
+    <created>20260210T100000Z</created>
+    <updated>20260210T110000Z</updated>
+    <tag>attachments</tag>
+    <note-attributes>
+      <source-url>https://example.com/screenshot</source-url>
+    </note-attributes>
+    <resource>
+      <data encoding="base64">iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==</data>
+      <mime>image/png</mime>
+      <width>1</width>
+      <height>1</height>
+      <resource-attributes>
+        <file-name>test-image.png</file-name>
+      </resource-attributes>
+    </resource>
+  </note>
+  <note>
+    <title></title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note>
+<div>This note has no title — should be handled as "Untitled"</div>
+</en-note>]]></content>
+    <created>20260205T080000Z</created>
+  </note>
+</en-export>

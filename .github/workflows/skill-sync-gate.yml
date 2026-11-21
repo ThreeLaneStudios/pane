@@ -1,0 +1,79 @@
+name: CI — ClawHub Skill Sync Gate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    paths:
+      - 'src-gateway/src/routes/**'
+      - 'src-gateway/src/server.rs'
+
+jobs:
+  skill-sync-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check gateway-API ↔ skill sync
+        run: |
+          # Precise route-table churn detection (avoid false positives on
+          # unrelated server.rs edits, e.g. TLS config changes)
+          ROUTE_DIFF=$(git diff origin/main...HEAD -- src-gateway/src/server.rs \
+            | grep -E '^[+-].*\.route\(' || true)
+          ROUTES_DIR_CHANGED=$(git diff --name-only origin/main...HEAD -- src-gateway/src/routes/ || true)
+
+          if [ -z "$ROUTE_DIFF" ] && [ -z "$ROUTES_DIR_CHANGED" ]; then
+            echo "✅ No gateway route-table or handler changes — skill sync check not applicable"
+            exit 0
+          fi
+
+          echo "🔍 Gateway route/handler changes detected:"
+          [ -n "$ROUTE_DIFF" ] && echo "$ROUTE_DIFF"
+          [ -n "$ROUTES_DIR_CHANGED" ] && echo "$ROUTES_DIR_CHANGED"
+          echo ""
+
+          SKILL_CHANGED=$(git diff --name-only origin/main...HEAD | grep -E '^clawhub/pane/' || true)
+          if [ -n "$SKILL_CHANGED" ]; then
+            echo "✅ Gateway route change + ClawHub skill updated in same PR"
+            exit 0
+          fi
+
+          HAS_LABEL=$(echo "$PR_LABELS_ENV" | grep -i 'skill-sync-checked' || true)
+          if [ -z "$HAS_LABEL" ]; then
+            LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+            HAS_LABEL=$(echo "$LABELS" | grep -i 'skill-sync-checked' || true)
+          fi
+
+          if [ -n "$HAS_LABEL" ]; then
+            echo "✅ skill-sync-checked label present — Matt confirmed no skill update needed"
+            exit 0
+          fi
+
+          echo "⚠️  CLAWHUB SKILL SYNC WARNING"
+          echo ""
+          echo "This PR changes the gateway's external HTTP API surface"
+          echo "(src-gateway/src/routes/ or the server.rs route table) but"
+          echo "does not touch clawhub/pane/ (the published ClawHub skill)."
+          echo ""
+          echo "The skill documents this API for external agents — a route,"
+          echo "field, or error-shape change here can silently make the"
+          echo "published skill wrong."
+          echo ""
+          echo "Either:"
+          echo "  1. Update clawhub/pane/SKILL.md and/or"
+          echo "     clawhub/pane/references/gateway-api.md in this PR"
+          echo "  2. Ask Matt to apply the 'skill-sync-checked' label after"
+          echo "     confirming no skill update is needed (e.g. purely"
+          echo "     internal refactor, no request/response/error shape change)"
+          echo ""
+          echo "Note: this check is advisory (does not fail the build)."
+          echo "It will be reviewed for promotion to a required check after"
+          echo "one release cycle of clean signal — see follow-up issue."
+          # Advisory — do not fail the build. Flip to `exit 1` (or add
+          # branch-protection requirement) once the pattern has proven out.
+          exit 0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_LABELS_ENV: ${{ join(github.event.pull_request.labels.*.name, '\n') }}

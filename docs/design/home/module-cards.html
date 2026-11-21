@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pane — Module Cards Design</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; padding: 40px; }
+  h1 { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.4); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 32px; }
+  .section-label { font-size: 10px; color: rgba(255,255,255,0.25); margin-bottom: 16px; width: 300px; text-align: center; }
+  .card { background: rgba(255,255,255,0.05); border-radius: 6px; padding: 12px; width: 300px; flex-shrink: 0; }
+  .card-collapsed { height: 44px; display: flex; align-items: center; justify-content: space-between; overflow: hidden; }
+  .card-header { font-size: 12px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .card-header .icon { font-size: 13px; }
+  .card-metric { font-size: 10px; color: rgba(255,255,255,0.3); white-space: nowrap; margin-left: auto; }
+  .body-text { font-size: 12px; color: rgba(255,255,255,0.6); line-height: 1.5; }
+  .dimmed { font-size: 10px; color: rgba(255,255,255,0.3); }
+  .truncated { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; font-size: 10px; color: rgba(255,255,255,0.3); }
+  .progress-track { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; flex: 1; }
+  .progress-fill { height: 100%; background: #00E4E4; border-radius: 2px; }
+  .progress-tiny { height: 3px; width: 28px; display: inline-block; vertical-align: middle; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+  .progress-tiny .progress-fill { height: 100%; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; color: rgba(255,255,255,0.6); }
+  .checkbox { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.2); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .checkbox.checked { background: #00E4E4; border-color: #00E4E4; }
+  .checkbox.checked::after { content: '✓'; font-size: 9px; color: #0a0a0f; font-weight: 700; }
+  .task-done { color: rgba(255,255,255,0.25); text-decoration: line-through; }
+  .input-field { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 10px; font-size: 12px; color: #fff; width: 100%; outline: none; font-family: inherit; resize: none; }
+  .input-field::placeholder { color: rgba(255,255,255,0.25); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .dot-green { background: #00C853; }
+  .dot-yellow { background: #FFD600; }
+  .dot-gray { background: rgba(255,255,255,0.2); }
+  .dot-small { width: 6px; height: 6px; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #fff; flex-shrink: 0; }
+  .slider-track { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; position: relative; flex: 1; }
+  .slider-fill { height: 100%; background: #00E4E4; border-radius: 2px; width: 70%; }
+  .slider-thumb { width: 14px; height: 14px; background: #00E4E4; border-radius: 50%; position: absolute; top: -5px; left: calc(70% - 7px); }
+  .btn-save { background: rgba(0,228,228,0.15); color: #00E4E4; font-size: 10px; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-family: inherit; }
+  .add-link { font-size: 11px; color: rgba(0,228,228,0.6); cursor: pointer; }
+  .expanded-body { margin-top: 10px; }
+  .lane-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+  .lane-label { width: 44px; color: rgba(255,255,255,0.6); font-size: 11px; flex-shrink: 0; }
+  .lane-pct { font-size: 11px; color: rgba(255,255,255,0.5); width: 30px; text-align: right; flex-shrink: 0; }
+  .lane-focus { font-size: 10px; color: rgba(255,255,255,0.3); margin-left: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agent-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer; }
+  .agent-row:hover { opacity: 0.8; }
+  .agent-name { font-size: 12px; color: #fff; font-weight: 500; }
+  .agent-role { font-size: 10px; color: rgba(255,255,255,0.3); }
+  .agent-meta { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .mantra { font-size: 13px; color: rgba(255,255,255,0.5); font-style: italic; margin-bottom: 10px; line-height: 1.5; }
+  .gratitude-entry { font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 4px; }
+  .gratitude-entry::before { content: '• '; color: rgba(255,255,255,0.2); }
+  .textarea-label { font-size: 10px; color: rgba(255,255,255,0.3); margin-bottom: 4px; }
+  .input-row { display: flex; gap: 6px; align-items: center; }
+  .btn-add { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); width: 28px; height: 28px; border-radius: 4px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .habit-section { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.04); display: flex; align-items: center; gap: 8px; }
+  .habit-label { font-size: 11px; color: rgba(255,255,255,0.4); }
+  .score-num { font-size: 12px; color: #00E4E4; font-weight: 600; min-width: 16px; }
+  .yesterday-ref { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.04); }
+  .task-project { font-size: 10px; color: rgba(255,255,255,0.2); margin-left: 2px; }
+  .scroll-body { max-height: 260px; overflow-y: auto; }
+  .date-header { font-size: 10px; color: rgba(255,255,255,0.25); margin-bottom: 8px; }
+  .collapsed-progress-group { display: flex; gap: 4px; align-items: center; }
+</style>
+</head>
+<body>
+
+<h1>Pane — Home Dashboard Module Cards</h1>
+
+<!-- 1. 3-5 Year Objectives -->
+<div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:24px;">
+  <div>
+    <div class="section-label">Collapsed</div>
+    <div class="card card-collapsed">
+      <div class="card-header"><span class="icon">🎯</span> 3-5 Year Objectives</div>
+      <div class="truncated">Achieve financial independence while…</div>
+    </div>
+  </div>
+  <div>
+    <div class="section-label">Expanded</div>
+    <div class="card">
+      <div class="card-header"><span class="icon">🎯</span> 3-5 Year Objectives</div>
+      <div class="expanded-body">
+        <div class="body-text" contenteditable="true" style="cursor:text;">Achieve financial independence ($XX,XXX/mo, $X.XM net worth) while becoming a recognized voice in the liberty movement and maintaining consistent creative output — within 3–5 years.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. Focus Lanes -->
+<div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:24px;">
+  <div>
+    <div class="section-label">Collapsed</div>
+    <div class="card card-collapsed">
+      <div class="card-header"><span class="icon">🛤</span> Focus Lanes</div>
+      <div class="collapsed-progress-group">
+        <div class="progress-tiny"><div class="progress-fill" style="width:60%"></div></div>
+        <div class="progress-tiny"><div class="progress-fill" style="width:45%"></div></div>
+        <div class="progress-tiny"><div class="progress-fill" style="width:25%"></div></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="section-label">Expanded</div>
+    <div class="card">
+      <div class="card-header" style="margin-bottom:10px;"><span class="icon">🛤</span> Focus Lanes</div>
+      <div class="lane-row">
+        <div class="lane-label">Wealth</div>
+        <div class="progress-track"><div class="progress-fill" style="width:60%"></div></div>
+        <div class="lane-pct">60%</div>
+        <div class="lane-focus">$X,XXX→$XX,XXX/mo</div>
+      </div>
+      <div class="lane-row">
+        <div class="lane-label">Voice</div>
+        <div class="progress-track"><div class="progress-fill" style="width:45%"></div></div>
+        <div class="lane-pct">45%</div>
+        <div class="lane-focus">Lumen Media growth, 100K</div>
+      </div>
+      <div class="lane-row">
+        <div class="lane-label">Music</div>
+        <div class="progress-track"><div class="progress-fill" style="width:25%"></div></div>
+        <div class="lane-pct">25%</div>
+        <div class="lane-focus">6 tracks/yr, 2 done</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. Vital Tasks -->
+<div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:24px;">
+  <div>
+    <div class="section-label">Collapsed</div>
+    <div class="card card-collapsed">
+      <div class="card-header"><span class="icon">✅</span> Vital Tasks</div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="dimmed">2 of 5</span>
+        <div class="progress-tiny" style="width:20px;"><div class="progress-fill" style="width:40%"></div></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="section-label">Expanded</div>
+    <div class="card">
+      <div class="card-header" style="margin-bottom:10px;"><span class="icon">✅</span> Vital Tasks <span class="card-metric">2 of 5</span></div>
+      <div class="checkbox-row">
+        <div class="checkbox checked"></div>
+        <span class="task-done">Fix hardcoded password</span>
+        <span class="task-project">Pane</span>
+      </div>
+      <div class="checkbox-row">
+        <div class="checkbox checked"></div>
+        <span class="task-done">Update env config</span>
+        <span class="task-project">Pane</span>
+      </div>
+      <div class="checkbox-row">
+        <div class="checkbox"></div>
+        <span>Build memory protection</span>
+        <span class="task-project">Pane</span>
+      </div>
+      <div class="checkbox-row">
+        <div class="checkbox"></div>
+        <span>Review Lumen Media articles</span>
+        <span class="task-project">Lumen Media</span>
+      </div>
+      <div class="checkbox-row">
+        <div class="checkbox"></div>
+        <span>Record podcast intro</span>
+        <span class="task-project">Music</span>
+      </div>
+      <div style="margin-top:8px;"><span class="add-link">+ Add task</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 4. Team -->
+<div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:24px;">
+  <div>
+    <div class="section-label">Collapsed</div>
+    <div class="card card-collapsed">
+      <div class="card-header"><span class="icon">🤖</span> Team</div>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <span class="dimmed" style="margin-right:4px;">3 online</span>
+        <span class="dot dot-small dot-green"></span>
+        <span class="dot dot-small dot-green"></span>
+        <span class="dot dot-small dot-gray"></span>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="section-label">Expanded</div>
+    <div class="card">
+      <div class="card-header" style="margin-bottom:10px;"><span class="icon">🤖</span> Team <span class="card-metric">3 online</span></div>
+      <div class="agent-row">
+        <div class="avatar">B</div>
+        <div><div class="agent-name">Brit</div><div class="agent-role">Team Lead</div></div>
+        <div class="agent-meta"><span class="dimmed">2m ago</span><span class="dot dot-green"></span></div>
+      </div>
+      <div class="agent-row">
+        <div class="avatar">S</div>
+        <div><div class="agent-name">Stia</div><div class="agent-role">Coder</div></div>
+        <div class="agent-meta"><span class="dimmed">Building...</span><span class="dot dot-green"></span></div>
+      </div>
+      <div class="agent-row">
+        <div class="avatar">R</div>
+        <div><div class="agent-name">Reed</div><div class="agent-role">Researcher</div></div>
+        <div class="agent-meta"><span class="dimmed">1h ago</span><span class="dot dot-gray"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 5. Mantras -->
+<div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:24px;">
+  <div>
+    <div class="section-label">Collapsed</div>
+    <div class="card card-collapsed">
+      <div class="card-header"><span class="icon">📿</span> Mantras</div>
+      <span class="dimmed">(4)</span>
+    </div>
+  </div>
+  <div>
+    <div class="section-label">Expanded</div>
+    <div class="card">
+      <div class="card-header" style="margin-bottom:12px;"><span class="icon">📿</span> Mantras</div>
+      <div class="mantra">"Progress over perfection"</div>
+      <div class="mantra">"Come with solutions, not problems"</div>
+      <div class="mantra">"What matters most?"</div>
+      <div class="mantra" style="margin-bottom:0;">"Find the combination nobody's played"</div>
+    </div>
+  </div>
+</div>
+
+<!-- 6. Gratitude -->
+<div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:24px;">
+  <div>
+    <div class="section-label">Collapsed</div>
+    <div class="card card-collapsed">
+      <div class="card-header"><span class="icon">🙏</span> Gratitude</div>
+      <span class="dimmed">3 today</span>
+    </div>
+  </div>
+  <div>
+    <div class="section-label">Expanded</div>
+    <div class="card">
+      <div class="card-header" style="margin-bottom:8px;"><span class="icon">🙏</span> Gratitude</div>
+      <div class="date-header">March 11, 2026</div>
+      <div class="input-row" style="margin-bottom:10px;">
+        <input class="input-field" placeholder="What are you grateful for today?" style="flex:1;">
+        <button class="btn-add">+</button>
+      </div>
+      <div class="gratitude-entry">Dana's support</div>
+      <div class="gratitude-entry">Good health</div>
+      <div class="gratitude-entry">Progress on Pane</div>
+      <div class="yesterday-ref">
+        <div class="dimmed">Yesterday: Morning coffee, Kitty & Len cuddles, podcast milestone</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 7. Habits -->
+<div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:24px;">
+  <div>
+    <div class="section-label">Collapsed</div>
+    <div class="card card-collapsed">
+      <div class="card-header"><span class="icon">📋</span> Habits</div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="dimmed">3 of 5</span>
+        <div class="progress-tiny" style="width:20px;"><div class="progress-fill" style="width:60%"></div></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="section-label">Expanded</div>
+    <div class="card">
+      <div class="card-header" style="margin-bottom:10px;"><span class="icon">📋</span> Habits <span class="card-metric">3 of 5</span></div>
+      <div class="checkbox-row"><div class="checkbox checked"></div><span>Exercise</span></div>
+      <div class="checkbox-row"><div class="checkbox checked"></div><span>Hydration</span></div>
+      <div class="checkbox-row"><div class="checkbox"></div><span>Read 30 min</span></div>
+      <div class="checkbox-row"><div class="checkbox checked"></div><span>Fitness habit</span></div>
+      <div class="checkbox-row"><div class="checkbox"></div><span>Creative output</span></div>
+      <div class="habit-section">
+        <span class="habit-label">Happiness</span>
+        <div class="slider-track">
+          <div class="slider-fill"></div>
+          <div class="slider-thumb"></div>
+        </div>
+        <span class="score-num">7</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 8. Reflection -->
+<div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:24px;">
+  <div>
+    <div class="section-label">Collapsed</div>
+    <div class="card card-collapsed">
+      <div class="card-header"><span class="icon">🌙</span> Reflection</div>
+      <span class="dimmed">Pending</span>
+    </div>
+  </div>
+  <div>
+    <div class="section-label">Expanded</div>
+    <div class="card">
+      <div class="card-header" style="margin-bottom:10px;"><span class="icon">🌙</span> Reflection</div>
+      <div class="scroll-body">
+        <div class="textarea-label">What went well today?</div>
+        <textarea class="input-field" rows="2" style="margin-bottom:8px;" placeholder=""></textarea>
+        <div class="textarea-label">What could improve?</div>
+        <textarea class="input-field" rows="2" style="margin-bottom:8px;" placeholder=""></textarea>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <span class="textarea-label" style="margin-bottom:0;">Day score (1–10):</span>
+          <input class="input-field" type="number" min="1" max="10" style="width:48px;text-align:center;padding:6px;">
+        </div>
+        <button class="btn-save">Save</button>
+        <div class="yesterday-ref">
+          <div class="dimmed">Yesterday: "Shipped v10.14, good energy. Could improve sleep schedule. Score: 7"</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

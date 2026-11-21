@@ -1,0 +1,56 @@
+name: CI — DMG Swap Path Test (self-hosted)
+
+# =============================================================================
+# Regression test for the DMG UDRW swap (#3049).
+#
+# Logic lives in scripts/tests/dmg-swap/test-swap-path.sh (independently
+# testable/runnable — see that script and
+# scripts/tests/dmg-swap/prove-catches-regression.sh), this workflow is
+# thin wiring: gate on which files changed, then run the script on the
+# self-hosted Mac runner (hdiutil/mount behavior is macOS-specific and the
+# ubuntu-latest runners used elsewhere in this repo can't exercise it).
+#
+# Runner declaration matches .github/workflows/e2e.yml
+# (`runs-on: [self-hosted, macOS, ARM64]`). Path-filter gating matches
+# .github/workflows/rust-tests.yml's `changes` job (dorny/paths-filter@v3)
+# so packaging breaks on scripts/build.sh fail on every PR that touches it,
+# not just on build day.
+# =============================================================================
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      dmg_swap: ${{ steps.filter.outputs.dmg_swap }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            dmg_swap:
+              - 'scripts/build.sh'
+              - 'scripts/lib/dmg.sh'
+              - 'scripts/tests/dmg-swap/**'
+              - '.github/workflows/dmg-swap-test.yml'
+
+  dmg-swap-test:
+    needs: [changes]
+    # #3106 C1 (Reed's security review): same-repo guard keeps fork PRs off
+    # the Studio -- this job is self-hosted and must never run a fork's own
+    # scripts/build.sh on real hardware. Kept on `pull_request` (unlike
+    # e2e.yml) because this job's whole purpose is catching a packaging
+    # regression before merge, on the PR that introduces it.
+    if: needs.changes.outputs.dmg_swap == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run DMG swap-path test
+        run: bash scripts/tests/dmg-swap/test-swap-path.sh

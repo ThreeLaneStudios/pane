@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pane — Color Options for Chat &amp; Cards</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; padding: 48px 40px; }
+  h1 { font-size: 24px; font-weight: 600; color: #fff; margin-bottom: 8px; letter-spacing: -0.3px; }
+  .subtitle { font-size: 14px; color: #888; margin-bottom: 48px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-width: 1200px; }
+  .option { border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow: hidden; background: #0a0a0f; }
+  .option-label { padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 10px; }
+  .option-label h2 { font-size: 15px; font-weight: 600; color: #fff; }
+  .option-label .swatch { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); }
+  .option-label .hex { font-size: 12px; color: #888; font-family: 'SF Mono', monospace; }
+  .option-body { padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+  .chat-section { display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 85%; }
+  .msg-sender { font-size: 11px; font-weight: 600; margin-bottom: 3px; }
+  .msg-sender.pane { color: #00E4E4; }
+  .msg-body { font-size: 13px; line-height: 1.6; color: #e0e0e0; }
+  .msg-time { font-size: 10px; color: #888; margin-top: 3px; }
+  .msg-user { display: flex; justify-content: flex-end; }
+  .msg-user .msg-bubble { border-radius: 12px 12px 4px 12px; padding: 9px 14px; }
+  .msg-assistant .msg-bubble { padding: 0; }
+  .chat-input { width: 100%; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 10px 14px; color: #e0e0e0; font-size: 13px; font-family: inherit; resize: none; outline: none; }
+  .chat-input::placeholder { color: #888; }
+  .note-card { border-radius: 10px; padding: 14px 16px; }
+  .note-card-title { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .note-card-meta { font-size: 11px; color: #888; margin-bottom: 8px; }
+  .note-card-body { font-size: 12px; line-height: 1.6; color: #e0e0e0; }
+  .section-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+</style>
+</head>
+<body>
+
+<h1>Color Options — Chat Bubbles &amp; Cards</h1>
+<p class="subtitle">Replacing the current purple (#1a1a2e) user bubbles. Each option shows chat messages, input box, and a note card.</p>
+
+<div class="grid">
+
+  <!-- Option A: Slate -->
+  <div class="option">
+    <div class="option-label"><div class="swatch" style="background:#1e293b;"></div><h2>Option A: Slate</h2><span class="hex">#1e293b</span></div>
+    <div class="option-body">
+      <div class="chat-section">
+        <div class="section-label">Chat</div>
+        <div class="msg msg-user"><div class="msg-bubble" style="background:#1e293b;"><div class="msg-body">Can you add a section about trunk capacity?</div></div></div>
+        <div class="msg msg-assistant"><div class="msg-bubble"><div class="msg-sender pane">Pane</div><div class="msg-body">Updated note: added trunk capacity section (184 chars)</div><div class="msg-time">now</div></div></div>
+        <div class="msg msg-user"><div class="msg-bubble" style="background:#1e293b;"><div class="msg-body">Perfect. Also mention the available color options for the 2025 model year.</div></div></div>
+      </div>
+      <div><div class="section-label" style="margin-bottom:8px;">Input</div><textarea class="chat-input" rows="1" placeholder="Ask to edit or refine..." style="background:#1e293b;"></textarea></div>
+      <div><div class="section-label" style="margin-bottom:8px;">Card</div><div class="note-card" style="background:#1e293b;"><div class="note-card-title">Passat Overview</div><div class="note-card-meta">General · Updated 2h ago</div><div class="note-card-body">The Volkswagen Passat is a midsize sedan known for its solid build quality and refined driving dynamics.</div></div></div>
+    </div>
+  </div>
+
+  <!-- Option B: Charcoal -->
+  <div class="option">
+    <div class="option-label"><div class="swatch" style="background:#262626;"></div><h2>Option B: Charcoal</h2><span class="hex">#262626</span></div>
+    <div class="option-body">
+      <div class="chat-section">
+        <div class="section-label">Chat</div>
+        <div class="msg msg-user"><div class="msg-bubble" style="background:#262626;"><div class="msg-body">Can you add a section about trunk capacity?</div></div></div>
+        <div class="msg msg-assistant"><div class="msg-bubble"><div class="msg-sender pane">Pane</div><div class="msg-body">Updated note: added trunk capacity section (184 chars)</div><div class="msg-time">now</div></div></div>
+        <div class="msg msg-user"><div class="msg-bubble" style="background:#262626;"><div class="msg-body">Perfect. Also mention the available color options for the 2025 model year.</div></div></div>
+      </div>
+      <div><div class="section-label" style="margin-bottom:8px;">Input</div><textarea class="chat-input" rows="1" placeholder="Ask to edit or refine..." style="background:#262626;"></textarea></div>
+      <div><div class="section-label" style="margin-bottom:8px;">Card</div><div class="note-card" style="background:#262626;"><div class="note-card-title">Passat Overview</div><div class="note-card-meta">General · Updated 2h ago</div><div class="note-card-body">The Volkswagen Passat is a midsize sedan known for its solid build quality and refined driving dynamics.</div></div></div>
+    </div>
+  </div>
+
+  <!-- Option C: Deep Teal -->
+  <div class="option">
+    <div class="option-label"><div class="swatch" style="background:#0d2d2d;"></div><h2>Option C: Deep Teal</h2><span class="hex">#0d2d2d</span></div>
+    <div class="option-body">
+      <div class="chat-section">
+        <div class="section-label">Chat</div>
+        <div class="msg msg-user"><div class="msg-bubble" style="background:#0d2d2d;"><div class="msg-body">Can you add a section about trunk capacity?</div></div></div>
+        <div class="msg msg-assistant"><div class="msg-bubble"><div class="msg-sender pane">Pane</div><div class="msg-body">Updated note: added trunk capacity section (184 chars)</div><div class="msg-time">now</div></div></div>
+        <div class="msg msg-user"><div class="msg-bubble" style="background:#0d2d2d;"><div class="msg-body">Perfect. Also mention the available color options for the 2025 model year.</div></div></div>
+      </div>
+      <div><div class="section-label" style="margin-bottom:8px;">Input</div><textarea class="chat-input" rows="1" placeholder="Ask to edit or refine..." style="background:#0d2d2d;"></textarea></div>
+      <div><div class="section-label" style="margin-bottom:8px;">Card</div><div class="note-card" style="background:#0d2d2d;"><div class="note-card-title">Passat Overview</div><div class="note-card-meta">General · Updated 2h ago</div><div class="note-card-body">The Volkswagen Passat is a midsize sedan known for its solid build quality and refined driving dynamics.</div></div></div>
+    </div>
+  </div>
+
+  <!-- Option D: Midnight -->
+  <div class="option">
+    <div class="option-label"><div class="swatch" style="background:#1a1a2e;"></div><h2>Option D: Midnight</h2><span class="hex">#1a1a2e</span></div>
+    <div class="option-body">
+      <div class="chat-section">
+        <div class="section-label">Chat</div>
+        <div class="msg msg-user"><div class="msg-bubble" style="background:#1a1a2e;"><div class="msg-body">Can you add a section about trunk capacity?</div></div></div>
+        <div class="msg msg-assistant"><div class="msg-bubble"><div class="msg-sender pane">Pane</div><div class="msg-body">Updated note: added trunk capacity section (184 chars)</div><div class="msg-time">now</div></div></div>
+        <div class="msg msg-user"><div class="msg-bubble" style="background:#1a1a2e;"><div class="msg-body">Perfect. Also mention the available color options for the 2025 model year.</div></div></div>
+      </div>
+      <div><div class="section-label" style="margin-bottom:8px;">Input</div><textarea class="chat-input" rows="1" placeholder="Ask to edit or refine..." style="background:#1a1a2e;"></textarea></div>
+      <div><div class="section-label" style="margin-bottom:8px;">Card</div><div class="note-card" style="background:#1a1a2e;"><div class="note-card-title">Passat Overview</div><div class="note-card-meta">General · Updated 2h ago</div><div class="note-card-body">The Volkswagen Passat is a midsize sedan known for its solid build quality and refined driving dynamics.</div></div></div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

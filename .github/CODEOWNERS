@@ -1,0 +1,7 @@
+* @matthewcarano
+# Spec and ADR authorship gate (#1039)
+# PRs touching these paths require Matt's review before merge.
+# Mechanical floor for the "Matt spawns spec sessions" rule.
+
+docs/spec/ @matthewcarano
+docs/adr/  @matthewcarano

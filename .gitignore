@@ -1,0 +1,64 @@
+node_modules/
+build/
+.svelte-kit/
+dist/
+target/
+.DS_Store
+
+# Pane runtime workspace artifacts (sync state created when running Pane locally
+# against the gateway). NOT source. Has been accidentally committed twice in two
+# days — PR #1315 and PR #1330. See #1317 (CI dirty-tree guard) for mechanical
+# detection of contamination beyond what this gitignore alone catches.
+.pane/
+*.log
+.env
+.env.*
+src-tauri/target/
+src-tauri/gen/
+*.bak
+*.bak[0-9]*
+*.backup*
+*.orig
+*.rej
+*.fix
+*.ver
+*.version
+*.step[0-9]*
+*.pre-*
+*.broken
+*.chat[0-9]*
+*.fix[0-9]*
+*.catchfix*
+*.tmp
+*.old
+.openclaw/
+
+# PR body scratch files (used to compose long PR bodies; never commit)
+pr-body-*.md
+
+# OpenClaw workspace files
+AGENTS.md
+HEARTBEAT.md
+IDENTITY.md
+SOUL.md
+TOOLS.md
+USER.md
+
+# The workspace-file patterns above match bare filenames at any depth (no
+# leading slash = gitignore matches anywhere). clawhub/pane/ is a real,
+# tracked source directory (ClawHub skill package) and must never be
+# silently swallowed if it ever ships a file with one of those names
+# (e.g. a future TOOLS.md reference doc).
+!/clawhub/**
+
+# Agent memory files (never commit — workspace-only)
+memory/
+
+# Gateway DMG build artifact (#3120 PR 4, pre-existing) — scripts/build-gateway-dmg.sh
+# runs `hdiutil create` with a bare relative filename (DMG_NAME="PaneGateway_${VERSION}_aarch64.dmg"),
+# which lands in whatever directory the script is invoked from (the repo root, in
+# normal use) before the script copies it on to ~/Shared/ExampleApp/builds/. Every run
+# drops this file at the repo root; it is a build output, never source. Matched
+# by prefix (not a bare `*.dmg`) so an unrelated future `.dmg` elsewhere in the
+# tree isn't silently swallowed.
+/PaneGateway_*.dmg

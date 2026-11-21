@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pane — Module Cards v2</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; display: flex; justify-content: center; padding: 32px 0; }
+  .column { width: 300px; display: flex; flex-direction: column; gap: 8px; }
+  .card { background: rgba(255,255,255,0.05); border-radius: 6px; padding: 14px; }
+  .card-title { font-size: 13px; font-weight: 700; color: #fff; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .obj-item { font-size: 12px; color: rgba(255,255,255,0.7); padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .obj-item:last-child { border-bottom: none; }
+  .lane-row { display: flex; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px; color: rgba(255,255,255,0.6); }
+  .lane-row:last-child { border-bottom: none; }
+  .lane-name { font-weight: 700; color: rgba(255,255,255,0.85); white-space: nowrap; }
+  .lane-focus { flex: 1; margin-left: 8px; }
+  .lane-metric { white-space: nowrap; color: #00E4E4; font-size: 11px; text-align: right; }
+  .task-row { display: flex; align-items: center; padding: 5px 0; font-size: 12px; color: rgba(255,255,255,0.7); }
+  .task-row.done { color: rgba(255,255,255,0.3); text-decoration: line-through; }
+  .cb { width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid #00E4E4; margin-right: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .cb.checked { background: #00E4E4; }
+  .cb.checked::after { content: ''; display: block; width: 4px; height: 7px; border: solid #0a0a0f; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); margin-top: -1px; }
+  .task-project { margin-left: auto; font-size: 10px; color: rgba(255,255,255,0.25); padding-left: 8px; white-space: nowrap; }
+  .add-task { font-size: 11px; color: #00E4E4; margin-top: 8px; cursor: pointer; }
+  .team-row { display: flex; align-items: center; padding: 5px 0; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #fff; margin-right: 10px; flex-shrink: 0; }
+  .team-name { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); }
+  .team-role { font-size: 10px; color: rgba(255,255,255,0.3); margin-left: 6px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; margin-left: auto; flex-shrink: 0; }
+  .dot-green { background: #00C853; }
+  .dot-yellow { background: #FFD600; }
+  .dot-gray { background: rgba(255,255,255,0.2); }
+  .team-activity { font-size: 10px; color: rgba(255,255,255,0.3); margin-left: 8px; white-space: nowrap; }
+  .mantra { font-size: 13px; font-style: italic; color: rgba(255,255,255,0.5); line-height: 2.0; }
+  .dimmed { font-size: 10px; color: rgba(255,255,255,0.3); }
+  .grat-input-row { display: flex; gap: 6px; margin-bottom: 10px; }
+  .grat-input-row input { flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 8px 10px; font-size: 12px; color: #fff; outline: none; }
+  .grat-input-row input::placeholder { color: rgba(255,255,255,0.25); }
+  .grat-add { background: rgba(0,228,228,0.15); color: #00E4E4; border: none; border-radius: 4px; padding: 0 10px; font-size: 14px; cursor: pointer; }
+  .grat-item { font-size: 12px; color: rgba(255,255,255,0.6); padding: 3px 0; }
+  .grat-divider { border-top: 1px solid rgba(255,255,255,0.04); margin: 8px 0; }
+  .grat-yesterday { font-size: 12px; color: rgba(255,255,255,0.2); padding: 2px 0; }
+  .habit-row { display: flex; align-items: center; padding: 4px 0; font-size: 12px; color: rgba(255,255,255,0.7); }
+  .slider-section { margin-top: 14px; }
+  .slider-label { font-size: 11px; color: rgba(255,255,255,0.4); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .slider-val { color: #00E4E4; font-weight: 600; font-size: 13px; }
+  input[type=range] { -webkit-appearance: none; width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #00E4E4; cursor: pointer; }
+  .refl-section { margin-bottom: 12px; }
+  .refl-section:last-child { margin-bottom: 0; }
+  .refl-label { font-size: 11px; color: rgba(255,255,255,0.35); margin-bottom: 6px; }
+  .num-selector { display: flex; gap: 4px; }
+  .num-circle { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 10px; color: rgba(255,255,255,0.5); cursor: pointer; }
+  .num-circle.selected { background: #00E4E4; color: #fff; font-weight: 600; }
+  textarea { width: 100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 10px; font-size: 12px; color: #fff; outline: none; resize: none; font-family: inherit; }
+  .pills { display: flex; gap: 6px; }
+  .pill { padding: 4px 12px; border-radius: 3px; background: rgba(255,255,255,0.08); font-size: 11px; color: rgba(255,255,255,0.5); cursor: pointer; }
+  .pill.selected { background: rgba(0,228,228,0.2); color: #00E4E4; }
+  .save-btn { float: right; background: rgba(0,228,228,0.15); color: #00E4E4; border: none; font-size: 10px; padding: 6px 16px; border-radius: 4px; cursor: pointer; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="column">
+  <div class="card">
+    <div class="card-title">3-5 Year Objectives</div>
+    <div class="obj-item">Build Pane into the OS-level AI advocate interface</div>
+    <div class="obj-item">Reach $XX,XXX/mo revenue and $X.XM net worth</div>
+    <div class="obj-item">Become a recognized voice in the liberty movement</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Focus Lanes</div>
+    <div class="lane-row"><span class="lane-name">Wealth</span><span class="lane-focus">Ship Pane</span><span class="lane-metric">Revenue: $X,XXX/mo</span></div>
+    <div class="lane-row"><span class="lane-name">Voice</span><span class="lane-focus">Lumen Media growth</span><span class="lane-metric">Followers: 6,255</span></div>
+    <div class="lane-row"><span class="lane-name">Music</span><span class="lane-focus">3rd song</span><span class="lane-metric">Released: 2/12</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Vital Tasks</div>
+    <div class="task-row"><div class="cb"></div>Build memory protection<span class="task-project">Pane</span></div>
+    <div class="task-row done"><div class="cb checked"></div>Fix hardcoded password<span class="task-project">Pane</span></div>
+    <div class="task-row"><div class="cb"></div>Review Lumen Media articles<span class="task-project">Lumen Media</span></div>
+    <div class="task-row"><div class="cb"></div>Record podcast intro<span class="task-project">Music</span></div>
+    <div class="add-task">+ Add task</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Team</div>
+    <div class="team-row"><div class="avatar">B</div><span class="team-name">Brit</span><span class="team-role">Team Lead</span><span class="status-dot dot-green"></span><span class="team-activity">2m ago</span></div>
+    <div class="team-row"><div class="avatar">S</div><span class="team-name">Stia</span><span class="team-role">Coder</span><span class="status-dot dot-green"></span><span class="team-activity">Building...</span></div>
+    <div class="team-row"><div class="avatar">R</div><span class="team-name">Reed</span><span class="team-role">Researcher</span><span class="status-dot dot-yellow"></span><span class="team-activity">1h ago</span></div>
+    <div class="team-row"><div class="avatar">Q</div><span class="team-name">Quinn</span><span class="team-role">QA</span><span class="status-dot dot-gray"></span><span class="team-activity">3h ago</span></div>
+    <div class="team-row"><div class="avatar">L</div><span class="team-name">Lane</span><span class="team-role">Designer</span><span class="status-dot dot-green"></span><span class="team-activity">Active</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Mantras</div>
+    <div class="mantra">Progress over perfection</div>
+    <div class="mantra">Come with solutions, not problems</div>
+    <div class="mantra">What matters most?</div>
+    <div class="mantra">Find the combination nobody's played</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Gratitude</div>
+    <div class="dimmed" style="margin-bottom:8px;">March 11, 2026</div>
+    <div class="grat-input-row"><input type="text" placeholder="What are you grateful for?"><button class="grat-add">+</button></div>
+    <div class="grat-item">Dana</div>
+    <div class="grat-item">Good health</div>
+    <div class="grat-item">Progress on Pane</div>
+    <div class="grat-divider"></div>
+    <div class="dimmed">Yesterday:</div>
+    <div class="grat-yesterday">Family dinner</div>
+    <div class="grat-yesterday">Sunshine</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Habits</div>
+    <div class="habit-row"><div class="cb checked"></div>Exercise</div>
+    <div class="habit-row"><div class="cb checked"></div>Hydration</div>
+    <div class="habit-row"><div class="cb"></div>Read 30 min</div>
+    <div class="habit-row"><div class="cb checked"></div>Fitness habit</div>
+    <div class="habit-row"><div class="cb"></div>Creative output</div>
+    <div class="slider-section">
+      <div class="slider-label">Happiness <span class="slider-val">8</span></div>
+      <input type="range" min="1" max="10" value="8">
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Reflection</div>
+    <div class="refl-section">
+      <div class="refl-label">How well did I optimize my time for my main 3-5 year objective(s)?</div>
+      <div class="num-selector">
+        <div class="num-circle">1</div><div class="num-circle">2</div><div class="num-circle">3</div><div class="num-circle">4</div><div class="num-circle">5</div><div class="num-circle">6</div><div class="num-circle selected">7</div><div class="num-circle">8</div><div class="num-circle">9</div><div class="num-circle">10</div>
+      </div>
+    </div>
+    <div class="refl-section">
+      <div class="refl-label">What did I do today to improve on my main objective(s)?</div>
+      <textarea rows="3"></textarea>
+    </div>
+    <div class="refl-section">
+      <div class="refl-label">What will I do tomorrow to impact my main objective(s)?</div>
+      <textarea rows="3"></textarea>
+    </div>
+    <div class="refl-section">
+      <div class="refl-label">How do I feel today?</div>
+      <div class="pills">
+        <div class="pill">Poor</div><div class="pill">Fair</div><div class="pill selected">Good</div><div class="pill">Great</div>
+      </div>
+    </div>
+    <button class="save-btn">Save</button>
+    <div style="clear:both"></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!-- @dsCard group="Flows & Specs" viewport="1440x900" name="Sheets — structured-table note type" subtitle="Grid editor (typed columns, ghost space, per-type editors), formula bar + error language, cell styling, board card face, sheet-native version history, CSV export." -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Pane — Sheets</title>
+<meta name="design_doc_mode" content="canvas"/>
+<link rel="stylesheet" href="./colors_and_type.css"/>
+<link rel="stylesheet" href="./kit.css"/>
+<link rel="stylesheet" href="./sheets.css"/>
+<style>html,body{overflow:visible;height:auto}body{background:#050505;min-height:100vh;margin:0}</style>
+</head>
+<body>
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="#0A0A0F"/>
+    <rect x="18" y="26" width="64" height="48" rx="4" fill="#141417" stroke="rgba(240,237,232,0.16)" stroke-width="1.2"/>
+    <rect x="18" y="26" width="64" height="10" fill="#232327"/>
+    <path d="M34 26v48M50 26v48M66 26v48M18 46h64M18 60h64" stroke="rgba(240,237,232,0.12)" stroke-width="1"/>
+    <rect x="50" y="46" width="16" height="14" fill="rgba(0,228,228,0.14)"/>
+    <path d="M50 60l5-5v5z" fill="#00E4E4"/>
+    <rect x="22" y="29" width="8" height="4" rx="1" fill="#00E4E4"/>
+  </svg>
+</template>
+<div id="app"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="pane-ui.jsx"></script>
+<script type="text/babel" src="sheets-shared.jsx"></script>
+<script type="text/babel" src="sheets-grid.jsx"></script>
+<script type="text/babel" src="sheets-formula.jsx"></script>
+<script type="text/babel" src="sheets-surfaces.jsx"></script>
+
+<script type="text/babel">
+function App() {
+  return (
+    <DesignCanvas
+      title="Pane — Sheets"
+      subtitle="A structured-table note type: typed columns, cell styling, formulas. Opens in the note editor's overlay with Kanban scrolling beneath. Click any frame to focus (←/→ within a section, ↑/↓ across sections)."
+    >
+      <DCSection id="grid" title="1 · Grid editor" subtitle="Sizes are kept, not fitted. Sticky header + gutter. Ghost space that commits on type. Selection, per-type editors, header verbs, resize.">
+        <DCArtboard id="context" label="In context · 1440×900" width={1440} height={900} style={{ background: '#0a0a0f' }}><ShInContext/></DCArtboard>
+        <DCArtboard id="overflow" label="Overflow & sticky bands" width={1240} height={470} style={{ background: '#0a0a0f' }}><ShOverflow/></DCArtboard>
+        <DCArtboard id="ghost" label="Ghost columns & rows" width={1160} height={824} style={{ background: '#0a0a0f' }}><ShGhost/></DCArtboard>
+        <DCArtboard id="new" label="A new sheet" width={1180} height={560} style={{ background: '#0a0a0f' }}><ShNewSheet/></DCArtboard>
+        <DCArtboard id="selection" label="Selection & navigation" width={1270} height={975} style={{ background: '#0a0a0f' }}><ShSelection/></DCArtboard>
+        <DCArtboard id="editors" label="Per-type cell editors" width={1080} height={940} style={{ background: '#0a0a0f' }}><ShEditors/></DCArtboard>
+        <DCArtboard id="mismatch" label="Type mismatch" width={1030} height={510} style={{ background: '#0a0a0f' }}><ShMismatch/></DCArtboard>
+        <DCArtboard id="header" label="Column header menu" width={1300} height={890} style={{ background: '#0a0a0f' }}><ShHeaderMenu/></DCArtboard>
+        <DCArtboard id="view" label="Sort & filter are view-only" width={1170} height={516} style={{ background: '#0a0a0f' }}><ShView/></DCArtboard>
+        <DCArtboard id="resize" label="Column & row resize" width={1240} height={1180} style={{ background: '#0a0a0f' }}><ShResize/></DCArtboard>
+      </DCSection>
+
+      <DCSection id="formula" title="2 · Formula experience" subtitle="Formula bar above the grid. Computed values distinguished by a corner wedge. One error treatment for six codes. Paused mode for very formula-heavy sheets.">
+        <DCArtboard id="fbar" label="Formula bar states" width={1180} height={900} style={{ background: '#0a0a0f' }}><ShFormulaBar/></DCArtboard>
+        <DCArtboard id="computed" label="Computed vs typed" width={950} height={552} style={{ background: '#0a0a0f' }}><ShComputed/></DCArtboard>
+        <DCArtboard id="errors" label="Error cells · all six codes" width={1080} height={1040} style={{ background: '#0a0a0f' }}><ShErrors/></DCArtboard>
+        <DCArtboard id="paused" label="Computation paused" width={1120} height={732} style={{ background: '#0a0a0f' }}><ShPaused/></DCArtboard>
+      </DCSection>
+
+      <DCSection id="styling" title="3 · Cell styling" subtitle="Background, text color, border style and thickness — from the toolbar or the context menu, on a palette built entirely from Pane's tokens.">
+        <DCArtboard id="styling" label="Panel, context menu, palette" width={1420} height={1210} style={{ background: '#0a0a0f' }}><ShStyling/></DCArtboard>
+        <DCArtboard id="coexist" label="Styling + wedges coexisting" width={1000} height={854} style={{ background: '#0a0a0f' }}><ShCoexist/></DCArtboard>
+      </DCSection>
+
+      <DCSection id="card" title="4 · Board card face" subtitle="Sheets on Kanban, project, folder and All Tasks. Built on the kit's kcard, revised to two data rows so a column of sheets costs no more scroll than a column of notes.">
+        <DCArtboard id="card" label="Card face & variants" width={1674} height={938} style={{ background: '#0a0a0f' }}><ShCard/></DCArtboard>
+      </DCSection>
+
+      <DCSection id="history" title="5 · Version history" subtitle="Existing two-pane shell, untouched. Only the right pane is new: a read-only mini-grid of the snapshot. Plus the source-label states for the left pane.">
+        <DCArtboard id="history" label="Sheet snapshot preview" width={1290} height={828} style={{ background: '#0a0a0f' }}><ShHistory/></DCArtboard>
+        <DCArtboard id="labels" label="Source labels" width={700} height={645} style={{ background: '#0a0a0f' }}><ShSourceLabels/></DCArtboard>
+      </DCSection>
+
+      <DCSection id="export" title="6 · CSV export" subtitle="Per-sheet, user-initiated, straight to the OS save dialog. Where the trigger lives.">
+        <DCArtboard id="export" label="Overflow menu" width={1090} height={592} style={{ background: '#0a0a0f' }}><ShExport/></DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+ReactDOM.createRoot(document.getElementById('app')).render(<App/>);
+</script>
+</body>
+</html>

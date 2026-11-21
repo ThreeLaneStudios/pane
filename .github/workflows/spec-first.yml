@@ -1,0 +1,118 @@
+name: CI — Spec-First Gate
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  spec-first-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check spec-first discipline
+        run: |
+          # Get changed files in this PR
+          CHANGED=$(git diff --name-only origin/main...HEAD)
+
+          # PR body passed via env var to handle multiline content safely.
+          # Must be `export`ed: the spec-first check below runs
+          # scripts/check-spec-first.sh as a SEPARATE PROCESS (not sourced),
+          # and an unexported shell variable is never inherited by a forked
+          # child. A plain (non-exported) assignment here silently makes
+          # PR_BODY look empty inside that script in real CI, even though it
+          # prints fine if you `echo "$PR_BODY"` in this same step — this bit
+          # PR #3015 itself (see the run_wiring_case section of
+          # scripts/tests/check-spec-first/run-tests.sh, where the real wiring
+          # tests actually live).
+          export PR_BODY="$PR_BODY_ENV"
+
+          # Check if any source code changed
+          SRC_CHANGED=$(echo "$CHANGED" | grep -E '^(src/|src-tauri/src/)' || true)
+          # Check if CHANGELOG was updated
+          CHANGELOG_CHANGED=$(echo "$CHANGED" | grep -E '^CHANGELOG.md$' || true)
+          # Check if source code changed excluding test files (for changelog-skip restriction)
+          CODE_CHANGED=$(echo "$CHANGED" | grep -E '^(src/|src-tauri/src/)' | grep -vE '^(src-tauri/src/tests/|.*\.test\.(ts|rs)$)' || true)
+
+          # Check for skip marker in PR description
+          CHANGELOG_SKIP=$(echo "$PR_BODY" | grep -iE '^[[:space:]]*changelog-skip:' || true)
+
+          FAILED=0
+
+          # --- Spec-first check ---
+          # Logic lives in scripts/check-spec-first.sh (moved out of this
+          # workflow so it's independently testable — see
+          # scripts/tests/check-spec-first/run-tests.sh). Reads the changed
+          # file list via stdin and the PR body via env PR_BODY; exits 0 if
+          # spec-first discipline is satisfied (or not applicable), 1 on a
+          # violation. See that script's header comment for the full rule
+          # and the two bugs this replaces (spec-covered-by: previously only
+          # read inside the spec-skip: branch; the docs check previously
+          # matched any docs/ path for core behavioral files).
+          if ! echo "$CHANGED" | scripts/check-spec-first.sh; then
+            FAILED=1
+          fi
+
+          # --- CHANGELOG check ---
+          # Why This Exists (changelog-skip): On 2026-04-21, PR #601 (folder scoping fix)
+          # initially used changelog-skip on a code change. Path-based restriction prevents
+          # changelog-skip when source code changes without Matt's explicit approval.
+          # Incidents: #601. Issues: #602.
+          
+          if [ -n "$SRC_CHANGED" ] && [ -z "$CHANGELOG_CHANGED" ] && [ -z "$CHANGELOG_SKIP" ]; then
+            echo ""
+            echo "❌ CHANGELOG MISSING"
+            echo ""
+            echo "Source files changed without a CHANGELOG.md update."
+            echo ""
+            echo "Either:"
+            echo "  1. Add an entry to the [Unreleased] section of CHANGELOG.md"
+            echo "     Write entries user-facing (what changed for the user, not what code changed)."
+            echo "     No-user-visible-effect changes get an 'internal:' prefix."
+            echo "     Example: 'internal: Refactored SSRF guard into shared module'"
+            echo "  2. Add 'changelog-skip: [reason, min 40 chars]' to the PR description"
+            echo "     AND 'CHANGELOG_SKIP_APPROVED_BY=matt'"
+            echo "     (typo fixes, comment updates, CI-only changes)"
+            echo ""
+            echo "Format: keepachangelog.com (Added/Changed/Deprecated/Removed/Fixed/Security)"
+            echo ""
+            FAILED=1
+          elif [ -n "$CHANGELOG_SKIP" ]; then
+            # Extract justification (everything after "changelog-skip:")
+            SKIP_REASON=$(echo "$CHANGELOG_SKIP" | sed 's/.*[Cc]hangelog-skip:[[:space:]]*//')
+            REASON_LEN=${#SKIP_REASON}
+            APPROVED=$(echo "$PR_BODY" | grep -iE '^[[:space:]]*CHANGELOG_SKIP_APPROVED_BY=matt' || true)
+            
+            # Path-based restriction: if source code changed (non-test), require both 40+ chars AND Matt approval
+            if [ -n "$CODE_CHANGED" ]; then
+              if [ "$REASON_LEN" -lt 40 ]; then
+                echo ""
+                echo "❌ changelog-skip justification too short ($REASON_LEN chars, minimum 40)"
+                echo "   Provided: $SKIP_REASON"
+                echo ""
+                FAILED=1
+              elif [ -z "$APPROVED" ]; then
+                echo ""
+                echo "❌ changelog-skip requires Matt's approval"
+                echo "   Add 'CHANGELOG_SKIP_APPROVED_BY=matt' to the PR description"
+                echo ""
+                FAILED=1
+              else
+                echo "⏭️ CHANGELOG check skipped (approved by Matt): $SKIP_REASON"
+              fi
+            else
+              # Non-code changes (docs, CI, tests) — allow skip without strict requirements
+              echo "⏭️ CHANGELOG check skipped: $SKIP_REASON"
+            fi
+          elif [ -n "$SRC_CHANGED" ] && [ -n "$CHANGELOG_CHANGED" ]; then
+            echo "✅ CHANGELOG updated"
+          elif [ -z "$SRC_CHANGED" ]; then
+            echo "✅ No source changes — CHANGELOG check not applicable"
+          fi
+
+          exit $FAILED
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BODY_ENV: ${{ github.event.pull_request.body }}

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "match": { "kind": "exact", "value": "anthropic/claude-opus-4-7" },
+      "strip": ["temperature", "top_p"],
+      "reason": "Anthropic migration guide: claude-opus-4-7 rejects sampling controls (temperature, top_p deprecated)"
+    },
+    {
+      "match": { "kind": "exact", "value": "claude-opus-4-7" },
+      "strip": ["temperature", "top_p"],
+      "reason": "Anthropic migration guide: claude-opus-4-7 rejects sampling controls (bare model ID without provider prefix)"
+    },
+    {
+      "match": { "kind": "prefix", "value": "anthropic/claude-opus-4-8" },
+      "strip": ["temperature", "top_p"],
+      "reason": "Forward-compat: Opus 4.8+ expected to carry same sampling-control deprecation as 4.7"
+    },
+    {
+      "match": { "kind": "prefix", "value": "claude-opus-4-8" },
+      "strip": ["temperature", "top_p"],
+      "reason": "Forward-compat: Opus 4.8+ expected to carry same sampling-control deprecation as 4.7 (bare model ID)"
+    }
+  ]
+}

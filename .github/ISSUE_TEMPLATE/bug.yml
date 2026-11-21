@@ -1,0 +1,113 @@
+name: Bug Report
+description: Report a bug or issue in Pane
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please provide as much detail as possible to help us fix it.
+
+  - type: input
+    id: spec-section
+    attributes:
+      label: Spec Section
+      description: "Which architecture spec section does this relate to? Use §X.Y format, or 'NEW: needs spec section' if none exists yet."
+      placeholder: "§24.10 or NEW: needs spec section"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: What happened? What did you expect to happen?
+      placeholder: "When I..., the app..., but I expected..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Open Pane
+        2. Navigate to...
+        3. Click on...
+        4. Observe...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened instead?
+      placeholder: "The app should..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: "Instead, the app..."
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Pane Version
+      description: What version of Pane are you using? (Help → About Pane)
+      placeholder: "v10.15.3"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: What OS are you running Pane on?
+      options:
+        - macOS Sequoia (15.x)
+        - macOS Sonoma (14.x)
+        - macOS Ventura (13.x)
+        - macOS Monterey (12.x)
+        - Other (specify in additional context)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How severe is this bug?
+      options:
+        - Minor annoyance
+        - Impacts my workflow
+        - Blocks critical functionality
+        - Data loss or corruption
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Messages / Logs
+      description: Include any error messages, console output, or relevant log entries
+      placeholder: "Paste error messages or logs here..."
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other information that might be helpful (screenshots, screen recordings, etc.)
+      placeholder: "Additional details..."
+    validations:
+      required: false

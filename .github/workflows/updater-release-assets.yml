@@ -1,0 +1,401 @@
+name: CI — Updater Release Assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing public release tag to backfill
+        required: true
+        default: v1.0.1
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: updater-assets-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  validate-release:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.release_tag }}
+          persist-credentials: false
+
+      - name: Validate immutable release source
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "❌ release_tag must be a public vX.Y.Z tag."
+            exit 1
+          fi
+          VERSION="${BASH_REMATCH[1]}"
+          APP_VERSION=$(node -p "require('./package.json').version")
+          if [ "$VERSION" != "$APP_VERSION" ]; then
+            echo "❌ Tag $RELEASE_TAG does not match app version $APP_VERSION."
+            exit 1
+          fi
+
+          TAGGED_COMMIT=$(git rev-parse HEAD)
+          MERGE_BASE=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/compare/${TAGGED_COMMIT}...prod" \
+            --jq '.merge_base_commit.sha')
+          if [ "$MERGE_BASE" != "$TAGGED_COMMIT" ]; then
+            echo "❌ Tagged commit $TAGGED_COMMIT is not on prod."
+            exit 1
+          fi
+
+          RELEASE=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")
+          if [ "$(jq -r '.draft' <<< "$RELEASE")" != "false" ] || \
+             [ "$(jq -r '.prerelease' <<< "$RELEASE")" != "false" ]; then
+            echo "❌ $RELEASE_TAG must already be a published public release."
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  sign-linux-updaters:
+    name: Sign exact Linux release packages
+    needs: validate-release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+          persist-credentials: false
+
+      - name: Install Node and pnpm
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.29.2
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download and sign exact published Linux payloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ] || [ -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ]; then
+            echo "❌ Tauri updater signing secrets are required."
+            exit 1
+          fi
+
+          STAGE="$RUNNER_TEMP/linux-updaters"
+          mkdir -p "$STAGE"
+          for attempt in 1 2 3; do
+            if gh release download "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --dir "$STAGE" \
+              --pattern 'pane-linux-x86_64.deb' \
+              --pattern 'pane-linux-x86_64.rpm' \
+              --pattern 'pane-linux-x86_64.AppImage'; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "❌ Failed to download Linux release payloads after 3 attempts."
+              exit 1
+            fi
+            rm -f "$STAGE"/*
+            sleep $((attempt * 5))
+          done
+
+          for payload in \
+            pane-linux-x86_64.deb \
+            pane-linux-x86_64.rpm \
+            pane-linux-x86_64.AppImage; do
+            pnpm exec tauri signer sign "$STAGE/$payload"
+            test -s "$STAGE/$payload.sig"
+          done
+
+      - name: Upload Linux updater signatures
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-updater-signatures
+          path: ${{ runner.temp }}/linux-updaters/*.sig
+          if-no-files-found: error
+          retention-days: 3
+
+  build-macos-updater:
+    name: Build signed macOS updater payload
+    needs: validate-release
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 60
+    env:
+      PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+          persist-credentials: false
+
+      - name: Add Rust toolchain to PATH
+        run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Import Developer ID certificate into temporary keychain
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ] || [ -z "$APPLE_CERTIFICATE_PASSWORD" ] || [ -z "$APPLE_SIGNING_IDENTITY" ]; then
+            echo "❌ Apple signing certificate secrets are required."
+            exit 1
+          fi
+
+          umask 077
+          CERTIFICATE_PATH="$RUNNER_TEMP/pane-developer-id.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/pane-updater-signing.keychain-db"
+          KEYCHAIN_PASSWORD=$(openssl rand -hex 32)
+
+          security list-keychains -d user \
+            | sed 's/^[[:space:]]*"//; s/"$//' \
+            > "$RUNNER_TEMP/original-keychains.txt"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          KEYCHAINS=("$KEYCHAIN_PATH")
+          while IFS= read -r keychain; do
+            [ -n "$keychain" ] && KEYCHAINS+=("$keychain")
+          done < "$RUNNER_TEMP/original-keychains.txt"
+          security list-keychains -d user -s "${KEYCHAINS[@]}"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | grep -F "$APPLE_SIGNING_IDENTITY"
+
+      - name: Build, notarize, and stage macOS updater payload
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          pnpm exec tauri build
+
+          APP="src-tauri/target/release/bundle/macos/Pane.app"
+          NOTARY_ZIP="$RUNNER_TEMP/Pane.app.zip"
+          STAGE="$RUNNER_TEMP/macos-updater"
+          PAYLOAD="$STAGE/pane-updater-macos-aarch64.tar.gz"
+          mkdir -p "$STAGE"
+          test -d "$APP"
+
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          ditto -c -k --keepParent "$APP" "$NOTARY_ZIP"
+          xcrun notarytool submit "$NOTARY_ZIP" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$APP"
+          xcrun stapler validate "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          spctl --assess --type execute --verbose=4 "$APP"
+
+          tar -C "$(dirname "$APP")" -czf "$PAYLOAD" "$(basename "$APP")"
+          pnpm exec tauri signer sign "$PAYLOAD"
+          test -s "$PAYLOAD"
+          test -s "$PAYLOAD.sig"
+
+      - name: Upload macOS updater payload and signature
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-updater-assets
+          path: ${{ runner.temp }}/macos-updater/
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Remove temporary signing keychain
+        if: always()
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/pane-updater-signing.keychain-db"
+          if [ -f "$RUNNER_TEMP/original-keychains.txt" ]; then
+            KEYCHAINS=()
+            while IFS= read -r keychain; do
+              [ -n "$keychain" ] && KEYCHAINS+=("$keychain")
+            done < "$RUNNER_TEMP/original-keychains.txt"
+            if [ "${#KEYCHAINS[@]}" -gt 0 ]; then
+              security list-keychains -d user -s "${KEYCHAINS[@]}"
+            fi
+          fi
+          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/pane-developer-id.p12" "$RUNNER_TEMP/original-keychains.txt"
+
+  publish-updater-assets:
+    name: Attach updater assets and latest.json
+    needs: [validate-release, sign-linux-updaters, build-macos-updater]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-updater-signatures
+          path: ${{ runner.temp }}/updater-assets
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-updater-assets
+          path: ${{ runner.temp }}/updater-assets
+
+      - name: Upload payloads and signatures before manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          STAGE="$RUNNER_TEMP/updater-assets"
+          for file in \
+            pane-updater-macos-aarch64.tar.gz \
+            pane-updater-macos-aarch64.tar.gz.sig \
+            pane-linux-x86_64.deb.sig \
+            pane-linux-x86_64.rpm.sig \
+            pane-linux-x86_64.AppImage.sig; do
+            test -s "$STAGE/$file"
+          done
+
+          upload_with_retry() {
+            local file="$1"
+            for attempt in 1 2 3; do
+              if gh release upload "$RELEASE_TAG" "$file" \
+                --repo "$GITHUB_REPOSITORY" \
+                --clobber; then
+                return 0
+              fi
+              sleep $((attempt * 5))
+            done
+            echo "❌ Failed to upload $(basename "$file") after 3 attempts."
+            return 1
+          }
+
+          for asset_name in \
+            pane-updater-macos-aarch64.tar.gz \
+            pane-updater-macos-aarch64.tar.gz.sig \
+            pane-linux-x86_64.deb.sig \
+            pane-linux-x86_64.rpm.sig \
+            pane-linux-x86_64.AppImage.sig; do
+            asset_path="$STAGE/$asset_name"
+            test "$(basename "$asset_path")" = "$asset_name"
+            upload_with_retry "$asset_path"
+            LOCAL_DIGEST=$(shasum -a 256 "$asset_path" | awk '{print $1}')
+            REMOTE_DIGEST=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" \
+              | jq -r --arg name "$asset_name" \
+                '.assets[] | select(.name == $name) | .digest' \
+              | sed 's/^sha256://')
+            if [ -z "$REMOTE_DIGEST" ] || [ "$LOCAL_DIGEST" != "$REMOTE_DIGEST" ]; then
+              echo "❌ Uploaded digest mismatch for $asset_name."
+              exit 1
+            fi
+          done
+
+      - name: Generate and upload latest.json last
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          VERSION: ${{ needs.validate-release.outputs.version }}
+        run: |
+          STAGE="$RUNNER_TEMP/updater-assets"
+          BASE_URL="https://updates.paneapp.ai/${RELEASE_TAG}"
+          PUB_DATE=$(gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json publishedAt \
+            --jq '.publishedAt')
+
+          jq -n \
+            --arg version "$VERSION" \
+            --arg notes "Pane v$VERSION" \
+            --arg pub_date "$PUB_DATE" \
+            --arg mac_url "$BASE_URL/pane-updater-macos-aarch64.tar.gz" \
+            --arg mac_sig "$(cat "$STAGE/pane-updater-macos-aarch64.tar.gz.sig")" \
+            --arg deb_url "$BASE_URL/pane-linux-x86_64.deb" \
+            --arg deb_sig "$(cat "$STAGE/pane-linux-x86_64.deb.sig")" \
+            --arg rpm_url "$BASE_URL/pane-linux-x86_64.rpm" \
+            --arg rpm_sig "$(cat "$STAGE/pane-linux-x86_64.rpm.sig")" \
+            --arg appimage_url "$BASE_URL/pane-linux-x86_64.AppImage" \
+            --arg appimage_sig "$(cat "$STAGE/pane-linux-x86_64.AppImage.sig")" \
+            '{
+              version: $version,
+              notes: $notes,
+              pub_date: $pub_date,
+              platforms: {
+                "darwin-aarch64": { url: $mac_url, signature: $mac_sig },
+                "linux-x86_64-deb": { url: $deb_url, signature: $deb_sig },
+                "linux-x86_64-rpm": { url: $rpm_url, signature: $rpm_sig },
+                "linux-x86_64": { url: $appimage_url, signature: $appimage_sig }
+              }
+            }' > "$STAGE/latest.json"
+
+          jq -e \
+            '.version == $version and
+             (.platforms | keys | sort) == ["darwin-aarch64", "linux-x86_64", "linux-x86_64-deb", "linux-x86_64-rpm"] and
+             all(.platforms[]; (.url | startswith("https://updates.paneapp.ai/")) and (.signature | length > 0))' \
+            --arg version "$VERSION" \
+            "$STAGE/latest.json" >/dev/null
+
+          for attempt in 1 2 3; do
+            if gh release upload "$RELEASE_TAG" "$STAGE/latest.json" \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "❌ Failed to upload latest.json after 3 attempts."
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
+
+          LOCAL_MANIFEST_DIGEST=$(shasum -a 256 "$STAGE/latest.json" | awk '{print $1}')
+          REMOTE_MANIFEST_DIGEST=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" \
+            --jq '.assets[] | select(.name == "latest.json") | .digest' \
+            | sed 's/^sha256://')
+          if [ "$LOCAL_MANIFEST_DIGEST" != "$REMOTE_MANIFEST_DIGEST" ]; then
+            echo "❌ Uploaded digest mismatch for latest.json."
+            exit 1
+          fi
+
+          for asset in \
+            latest.json \
+            pane-updater-macos-aarch64.tar.gz \
+            pane-updater-macos-aarch64.tar.gz.sig \
+            pane-linux-x86_64.deb.sig \
+            pane-linux-x86_64.rpm.sig \
+            pane-linux-x86_64.AppImage.sig; do
+            gh release view "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json assets \
+              --jq '.assets[].name' \
+              | grep -Fx "$asset"
+          done

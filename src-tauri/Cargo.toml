@@ -1,0 +1,122 @@
+[package]
+name = "pane"
+version = "1.0.86"
+description = "Your notes. Your machine. Your rules."
+authors = ["Three Lane Studios"]
+license = "Apache-2.0"
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "pane_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.4", features = [] }
+
+[dependencies]
+# unbounded_depth (#2874 item 60 PR 3, round 5): the text-fallback tool-call
+# parsing path (find_tool_calls/try_parse_tool_json/strip_text_tool_blocks
+# in src/ai/commands.rs) removes serde_json's default 128-deep recursion
+# limit entirely rather than special-casing its "recursion limit exceeded"
+# error (Matt's ruling: "we always build the correct fix, never a
+# workaround"). serde_stacker (same author as serde_json) grows the real
+# call stack dynamically so parsing at unbounded depth can't overflow it.
+serde_json = { version = "1.0", features = ["unbounded_depth"] }
+serde_stacker = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "=2.11.2", features = ["devtools", "protocol-asset"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-log = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "=2.7.1"
+tauri-plugin-shell = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+tauri-plugin-deep-link = "2"
+# Cargo cannot select dependencies by `debug_assertions`; registration remains debug-only in lib.rs.
+tauri-plugin-playwright = "0.2"
+chrono = "0.4"
+dirs = "6.0"
+# "functions"/"hooks" are pure additive Rust-API feature flags (empty `= []`
+# deps upstream, no C code/behavior change) — needed by the migrate_v91
+# rebuild-atomicity test (migrations.rs) to stub `crsql_as_crr` via
+# create_scalar_function and to deny a specific DDL statement via `authorizer`
+# without requiring the real cr-sqlite extension to be loaded in unit tests.
+rusqlite = { version = "0.32", features = ["bundled", "load_extension", "backup", "functions", "hooks"] }
+uuid = { version = "1.10", features = ["v4"] }
+regex = "1.10"
+mime_guess = "2.0"
+base64 = "0.22"
+tokio-tungstenite = "0.24"
+tokio = { version = "1", features = ["full"] }
+# mdns-sd and hostname removed — was triggering macOS local network popup on every launch (#154)
+# Re-add when sync-over-LAN is user-activated
+# mdns-sd = "0.11"
+# hostname = "0.4"
+hex = "0.4"
+futures-util = { version = "0.3", features = ["sink"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "blocking"] }
+urlencoding = "2.1"
+url = "2.5"
+chacha20poly1305 = "0.10"
+argon2 = "0.5"
+blake3 = "1.5"
+sha2 = "0.10"
+rand = "0.8"
+axum = "0.8"
+rcgen = "0.13"
+axum-server = { version = "0.7", features = ["tls-rustls"] }
+rustls = { version = "0.23", features = ["ring"] }
+
+rmp-serde = "1.3"
+notify = "7"
+local-ip-address = "0.6"
+tempfile = "3"
+semver = { version = "1.0", features = ["serde"] }
+trash = "5"
+# #2591 / ADR-0064 §4.6.6 — web_fetch HTML parsing + readability extraction.
+scraper = "0.20"
+readabilityrs = "0.1.4"
+# #3050 PR 9, docs/spec/runtime.md §36.9.3 — read_attachment extraction.
+# pdf-extract: the one genuinely NEW dependency this PR adds (no PDF crate
+# existed anywhere in the dependency graph before). Pure Rust, MIT, wraps
+# lopdf for parsing (lopdf's own dependency, flate2, was already resolved
+# transitively via tauri-plugin-updater — see Cargo.lock diff in the PR
+# report). zip/quick-xml are NOT new dependencies — both were already
+# resolved transitively (zip via tauri-plugin-updater, quick-xml via
+# plist) at the exact versions pinned below; promoting them to direct
+# deps here resolves zero new package versions.
+# #3050 PR 9 — `zip`'s own `default` feature set pulls in aes-crypto,
+# bzip2, lzma, ppmd, zstd, etc. (every codec it supports, for both read
+# AND write) — docx reading needs only deflate decompression. Scoped to
+# `deflate-flate2-zlib-rs` specifically (not the broader `deflate` umbrella,
+# which also pulls in the `zopfli` write-side compressor this PR never
+# writes a zip with) to keep the Cargo.lock delta to pdf-extract/lopdf's
+# own tree, per Reed's scope audit's "report if anything else moves."
+pdf-extract = "0.12"
+zip = { version = "9.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+quick-xml = "0.42"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["sync-secret-service"] }
+
+[dev-dependencies]
+tempfile = "3"
+futures-util = { version = "0.3", features = ["sink"] }
+mockito = "1.7"
+serial_test = "3"
+# #2775 Tier 3: real local TLS listener presenting a deliberately-mismatched
+# SPKI cert, to prove the pinned client actually rejects it (rather than the
+# request silently succeeding via a danger_accept fallback).
+tokio-rustls = "0.26"
+# #2629: enables tauri::test::{mock_builder, mock_app} so tests can build a real
+# tauri::State<DbState> and invoke #[tauri::command] fns (e.g. upsert_agent)
+# through the actual handler signature, not just their inner `_impl` helpers.
+tauri = { version = "=2.11.2", features = ["test"] }

@@ -1,0 +1,32 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "enables the default permissions",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "fs:default",
+    "dialog:default",
+    "shell:default",
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [
+        {
+          "path": "$HOME/Pane/Projects/*/Assets/**"
+        }
+      ]
+    },
+    "fs:allow-write-text-file",
+    "notification:default",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-notify",
+    "updater:default",
+    "process:default",
+    "deep-link:default",
+    "playwright:default",
+    "core:webview:allow-set-webview-zoom"
+  ]
+}

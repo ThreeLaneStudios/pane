@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Pane Sheets — Addendum</title>
+<link rel="stylesheet" href="./colors_and_type.css"/>
+<link rel="stylesheet" href="./kit.css"/>
+<link rel="stylesheet" href="sheets.css"/>
+<style>
+html,body{margin:0;background:#0a0a0f;overflow:auto;height:auto}
+body{font-family:var(--font-sans)}
+.doc{max-width:1520px;margin:0 auto;padding:44px 32px 120px}
+.doc__head{padding:0 0 20px;border-bottom:1px solid var(--border-faint)}
+.doc__kick{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+.doc__title{font-size:26px;font-weight:700;color:var(--fg-1);margin:0 0 8px;letter-spacing:-0.02em}
+.doc__sub{font-size:14px;line-height:1.6;color:var(--fg-3);margin:0;max-width:860px}
+.sec{padding:44px 0 8px}
+.sec__title{font-size:18px;font-weight:600;color:var(--fg-1);margin:0 0 4px}
+.sec__sub{font-size:13px;color:var(--fg-4);margin:0 0 22px;line-height:1.55;max-width:860px}
+.fw{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#0a0a0f}
+.fw__lab{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-4);padding:10px 14px;border-bottom:1px solid var(--border-faint);background:var(--surface-1)}
+.fw__body{overflow:auto}
+</style>
+</head>
+<body>
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="#0A0A0F"/>
+    <rect x="20" y="34" width="34" height="14" rx="4" fill="#00E4E4"/>
+    <rect x="58" y="34" width="24" height="14" rx="4" fill="none" stroke="#00E4E4" stroke-width="1.6"/>
+    <rect x="20" y="56" width="62" height="6" rx="3" fill="#2a2a30"/>
+    <rect x="20" y="66" width="46" height="6" rx="3" fill="#2a2a30"/>
+  </svg>
+</template>
+<div class="doc">
+  <div class="doc__head">
+    <div class="doc__kick">Addendum · appends to the locked Sheets package</div>
+    <h1 class="doc__title">New Sheet button · Select choices editor</h1>
+    <p class="doc__sub">Two frames only. Both use the same tokens and the same Pane UI kit as the locked package, and nothing already locked is changed by them. Notes and the ruling record are in <code>NOTES.md</code>.</p>
+  </div>
+  <div id="mount"></div>
+</div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="pane-ui.jsx"></script>
+<script type="text/babel" src="sheets-shared.jsx"></script>
+<script type="text/babel" src="addendum-deps.jsx"></script>
+<script type="text/babel" src="sheets-addendum.jsx"></script>
+<script type="text/babel">
+function Sec({ title, sub, label, children }) {
+  return (
+    <section className="sec">
+      <h2 className="sec__title">{title}</h2>
+      <p className="sec__sub">{sub}</p>
+      <div className="fw"><div className="fw__lab">{label}</div><div className="fw__body">{children}</div></div>
+    </section>
+  );
+}
+function Doc() {
+  return (
+    <React.Fragment>
+      <Sec
+        title="A · New Sheet button pair"
+        sub="+ New Sheet beside + New Note in each host view's header. Same box, inverted ground, same plus glyph. Shown at normal width, then what collapses as the header narrows."
+        label="A · New Sheet button pair"
+      ><ShNewSheetBtn/></Sec>
+      <Sec
+        title="B · Select choices editor"
+        sub="Where a select column's choices are created and edited. Reached from the column header menu's conditional sixth row, or from the cell dropdown's Edit options row. Six panel states."
+        label="B · Select choices editor"
+      ><ShOptions/></Sec>
+    </React.Fragment>
+  );
+}
+ReactDOM.createRoot(document.getElementById('mount')).render(<Doc/>);
+</script>
+</body>
+</html>

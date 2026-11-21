@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# =============================================================================
+# fixtures/gh — fake `gh` CLI for testing check-spec-first.sh's
+# verify_covered_by() without network access.
+# =============================================================================
+# Driven entirely by env vars the test sets before invoking the real script:
+#   FAKE_GH_STATE       — value returned for `gh pr view <N> --json state -q .state`
+#                         (e.g. MERGED, OPEN, CLOSED, or unset/empty to simulate
+#                         "not found")
+#   FAKE_GH_SPEC_FILES  — value returned for `gh pr diff <N> --name-only`
+#                         (newline-separated paths; include a docs/spec/ path
+#                         to simulate "touched the spec")
+#
+# This file is prepended onto PATH by run-tests.sh; it is never installed or
+# referenced by the production script or workflow.
+# =============================================================================
+set -euo pipefail
+
+case "$1 $2" in
+  "pr view")
+    if [ -z "${FAKE_GH_STATE:-}" ]; then
+      exit 1
+    fi
+    echo "$FAKE_GH_STATE"
+    ;;
+  "pr diff")
+    printf '%s\n' "${FAKE_GH_SPEC_FILES:-}"
+    ;;
+  *)
+    echo "fixtures/gh: unexpected invocation: $*" >&2
+    exit 1
+    ;;
+esac

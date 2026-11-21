@@ -1,0 +1,419 @@
+name: CI — §4 Integration Test Enforcement
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  # §36.11 / #3059: "The scheduler is the only component that starts a turn
+  # nobody typed." Deliberately NOT gated by changed-files like the two jobs
+  # below — a `TurnOrigin::User`/`TurnOrigin::Job` construction could be
+  # introduced in a file this PR never otherwise touches (e.g. a brand-new
+  # module), and the invariant is about the whole tree's state, not about
+  # what one PR's diff happened to touch. Runs on every PR, scans the whole
+  # `src-tauri/src/` (and `src-gateway/src/`, for parity with the symbol
+  # collector's own two-crate walk) every time.
+  turn-origin-ast-check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: scripts/section-4-analyzer
+
+      - name: Build §4 analyzer
+        run: |
+          echo "[BUILD] Building section-4-analyzer..."
+          cargo build --release --manifest-path scripts/section-4-analyzer/Cargo.toml
+          echo "[BUILD] Analyzer built successfully"
+
+      - name: Run TurnOrigin construction-site gate (§36.11)
+        run: |
+          echo "[TURN-ORIGIN] Scanning the whole tree for TurnOrigin::User/Job construction..."
+
+          ANALYZER_BIN="scripts/section-4-analyzer/target/release/section-4-analyzer"
+
+          if ! $ANALYZER_BIN check-turn-origin src-tauri/src src-gateway/src; then
+            echo ""
+            echo "========================================"
+            echo "❌ §36.11 TURN-ORIGIN CONSTRUCTION VIOLATION"
+            echo "========================================"
+            echo ""
+            echo "TurnOrigin::User or TurnOrigin::Job was constructed outside the"
+            echo "two sanctioned sites (the interactive ai_chat_stream command, or"
+            echo "the scheduler tick). See docs/spec/runtime.md §36.11 and"
+            echo "scripts/section-4-analyzer/src/turn_origin.rs's ALLOWED_CONSTRUCTORS."
+            echo ""
+            echo "If this IS a legitimate new sanctioned site (e.g. PR 2's scheduler"
+            echo "tick, under a different function name than the placeholder), update"
+            echo "ALLOWED_CONSTRUCTORS in the same PR that adds the construction."
+            exit 1
+          fi
+
+          echo "✅ No TurnOrigin construction-site violations"
+
+  section-4-ast-check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Identify integration test files in PR
+        id: identify-tests
+        run: |
+          # Get changed files compared to main
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR origin/main...HEAD)
+          
+          # Filter for integration test files
+          # Pattern 1: src-tauri/src/**/*_integration_test.rs
+          # Pattern 2: src-gateway/tests/integration/**/*.rs
+          INTEGRATION_TESTS=$(echo "$CHANGED_FILES" | grep -E '(src-tauri/src/.*_integration_test\.rs|src-gateway/tests/integration/.*\.rs)' || true)
+          
+          if [ -z "$INTEGRATION_TESTS" ]; then
+            echo "No integration test files changed"
+            echo "has_tests=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "Integration test files changed:"
+          echo "$INTEGRATION_TESTS"
+          echo "has_tests=true" >> $GITHUB_OUTPUT
+          
+          # Save test files list to a file for next steps
+          echo "$INTEGRATION_TESTS" > /tmp/integration_test_files.txt
+      
+      - name: Install Rust
+        if: steps.identify-tests.outputs.has_tests == 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        if: steps.identify-tests.outputs.has_tests == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: scripts/section-4-analyzer
+
+      - name: Build §4 analyzer
+        if: steps.identify-tests.outputs.has_tests == 'true'
+        run: |
+          echo "[BUILD] Building section-4-analyzer..."
+          cargo build --release --manifest-path scripts/section-4-analyzer/Cargo.toml
+          echo "[BUILD] Analyzer built successfully"
+      
+      - name: Collect production symbols
+        if: steps.identify-tests.outputs.has_tests == 'true'
+        run: |
+          echo "[COLLECT] Collecting production symbols from src-tauri/src/ and src-gateway/src/..."
+          scripts/section-4-analyzer/target/release/section-4-analyzer collect-symbols src-tauri/src/ src-gateway/src/ > /tmp/symbols.json
+          
+          # Show count for transparency
+          SYMBOL_COUNT=$(cat /tmp/symbols.json | grep -c '"' || echo "0")
+          echo "[COLLECT] Collected production symbols (approximately $SYMBOL_COUNT functions)"
+      
+      - name: Run §4 AST analyzer
+        if: steps.identify-tests.outputs.has_tests == 'true'
+        run: |
+          echo "[ANALYZE] Running §4 analyzer on changed integration tests..."
+          
+          ANALYZER_BIN="scripts/section-4-analyzer/target/release/section-4-analyzer"
+          SYMBOLS_FILE="/tmp/symbols.json"
+          TEST_FILES="/tmp/integration_test_files.txt"
+          
+          ALL_VIOLATIONS=""
+          ALL_UNTESTABLE="[]"
+          EXIT_CODE=0
+          
+          # Process each test file
+          while IFS= read -r test_file; do
+            if [ -z "$test_file" ]; then
+              continue
+            fi
+            
+            echo ""
+            echo "[ANALYZE] Checking: $test_file"
+            
+            # Run analyzer - it outputs JSON with violations and untestable_annotations
+            RESULT=$($ANALYZER_BIN analyze "$test_file" "$SYMBOLS_FILE" 2>&1)
+            ANALYZER_EXIT=$?
+            
+            # Extract violations and untestable annotations from JSON
+            # The analyzer outputs JSON to stdout, errors to stderr
+            RESULT_JSON=$(echo "$RESULT" | grep -v '\[ANALYZER\]' || true)
+            
+            if [ $ANALYZER_EXIT -ne 0 ]; then
+              # Violations found
+              echo "❌ Violations found in $test_file"
+              echo "$RESULT_JSON"
+              ALL_VIOLATIONS="${ALL_VIOLATIONS}${RESULT_JSON}\n"
+              EXIT_CODE=1
+            else
+              echo "✅ No violations in $test_file"
+              
+              # Collect untestable annotations
+              UNTESTABLE=$(echo "$RESULT_JSON" | jq -r '.untestable_annotations // []')
+              if [ "$UNTESTABLE" != "[]" ] && [ -n "$UNTESTABLE" ]; then
+                echo "[ANALYZE] Found untestable annotations, will verify issue status"
+                # Merge into all untestable annotations array
+                if [ "$ALL_UNTESTABLE" = "[]" ]; then
+                  ALL_UNTESTABLE="$UNTESTABLE"
+                else
+                  ALL_UNTESTABLE=$(echo "$ALL_UNTESTABLE" | jq --argjson new "$UNTESTABLE" '. + $new')
+                fi
+              fi
+            fi
+          done < "$TEST_FILES"
+          
+          # Save untestable annotations for next step
+          echo "$ALL_UNTESTABLE" > /tmp/untestable_annotations.json
+          
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo ""
+            echo "================================"
+            echo "❌ §4 INTEGRATION TEST VIOLATIONS"
+            echo "================================"
+            echo ""
+            echo -e "$ALL_VIOLATIONS"
+            echo ""
+            echo "Integration tests must call production entry points."
+            echo "See docs/dev-hygiene-playbook.md §4 and docs/adr/0016-mechanical-section-4-enforcement.md"
+            echo ""
+            echo "Allowlist annotations:"
+            echo "  /// §4-helper-test: <justification>"
+            echo "  /// §4-untestable: #<issue-number>"
+            echo ""
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ All integration tests passed §4 enforcement"
+      
+      - name: Verify §4-untestable linked issues are open
+        if: steps.identify-tests.outputs.has_tests == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "[ISSUE-CHECK] Verifying §4-untestable linked issues are open..."
+          
+          UNTESTABLE_FILE="/tmp/untestable_annotations.json"
+          
+          if [ ! -f "$UNTESTABLE_FILE" ]; then
+            echo "[ISSUE-CHECK] No untestable annotations file found, skipping"
+            exit 0
+          fi
+          
+          ANNOTATIONS=$(cat "$UNTESTABLE_FILE")
+          COUNT=$(echo "$ANNOTATIONS" | jq 'length')
+          
+          if [ "$COUNT" -eq 0 ]; then
+            echo "[ISSUE-CHECK] No untestable annotations found, skipping"
+            exit 0
+          fi
+          
+          echo "[ISSUE-CHECK] Found $COUNT untestable annotation(s) to verify"
+          
+          FAILED=0
+          FAILED_ISSUES=""
+          
+          # Check each issue
+          for i in $(seq 0 $(($COUNT - 1))); do
+            ANNOTATION=$(echo "$ANNOTATIONS" | jq -r ".[$i]")
+            ISSUE_NUMBER=$(echo "$ANNOTATION" | jq -r '.issue_number')
+            TEST_NAME=$(echo "$ANNOTATION" | jq -r '.test_name')
+            FILE=$(echo "$ANNOTATION" | jq -r '.file')
+            
+            echo ""
+            echo "[ISSUE-CHECK] Checking issue #$ISSUE_NUMBER (from test '$TEST_NAME' in $FILE)"
+            
+            # Use gh CLI to check issue status (it's available in GitHub Actions by default)
+            if ! ISSUE_DATA=$(gh api "/repos/${{ github.repository }}/issues/$ISSUE_NUMBER" 2>&1); then
+              echo "❌ Issue #$ISSUE_NUMBER does not exist or is not accessible"
+              echo "   Error: $ISSUE_DATA"
+              FAILED_ISSUES="${FAILED_ISSUES}\n  - Issue #${ISSUE_NUMBER} (test: ${TEST_NAME}, file: ${FILE}): Does not exist or is not accessible"
+              FAILED=1
+              continue
+            fi
+            
+            STATE=$(echo "$ISSUE_DATA" | jq -r '.state')
+            TITLE=$(echo "$ISSUE_DATA" | jq -r '.title')
+            
+            echo "   Issue: #$ISSUE_NUMBER - $TITLE"
+            echo "   State: $STATE"
+            
+            if [ "$STATE" != "open" ]; then
+              echo "❌ Issue #$ISSUE_NUMBER is $STATE, but §4-untestable annotations require open issues"
+              FAILED_ISSUES="${FAILED_ISSUES}\n  - Issue #${ISSUE_NUMBER} (test: ${TEST_NAME}, file: ${FILE}): State is ${STATE}, expected open"
+              FAILED=1
+            else
+              echo "✅ Issue #$ISSUE_NUMBER is open"
+            fi
+          done
+          
+          if [ $FAILED -ne 0 ]; then
+            echo ""
+            echo "========================================"
+            echo "❌ §4-UNTESTABLE ISSUE VERIFICATION FAILED"
+            echo "========================================"
+            echo ""
+            echo "The following issues referenced by §4-untestable annotations are not open:"
+            echo -e "$FAILED_ISSUES"
+            echo ""
+            echo "§4-untestable annotations must reference open GitHub issues."
+            echo ""
+            echo "To fix:"
+            echo "  1. If the issue was closed because the test is now testable:"
+            echo "     Remove the §4-untestable annotation and update the test to call production code"
+            echo ""
+            echo "  2. If the issue was closed but the test is still untestable:"
+            echo "     Re-open the issue or create a new issue explaining why it remains untestable,"
+            echo "     then update the annotation to reference the new/re-opened issue"
+            echo ""
+            echo "  3. If the issue doesn't exist:"
+            echo "     Create an issue documenting why this test cannot call production code,"
+            echo "     then update the annotation with the issue number"
+            echo ""
+            echo "See docs/adr/0016-mechanical-section-4-enforcement.md for details"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ All §4-untestable linked issues are open"
+
+  section-4-test-the-test-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check PR body for §4 test-the-test section
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # Get changed files
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+          
+          # Check if any integration test files changed
+          INTEGRATION_TESTS=$(echo "$CHANGED_FILES" | grep -E '(src-tauri/src/.*_integration_test\.rs|src-gateway/tests/integration/.*\.rs)' || true)
+          
+          if [ -z "$INTEGRATION_TESTS" ]; then
+            echo "✅ No integration test files changed — test-the-test check skipped"
+            exit 0
+          fi
+          
+          echo "Integration test files changed:"
+          echo "$INTEGRATION_TESTS"
+          echo ""
+          echo "Checking PR body for §4 test-the-test section..."
+          
+          # Check for the required heading
+          if ! echo "$PR_BODY" | grep -q "^## §4 test-the-test"; then
+            echo "❌ MISSING §4 test-the-test SECTION"
+            echo ""
+            echo "PRs that touch integration tests must include a test-the-test artifact."
+            echo ""
+            echo "Add this section to your PR description:"
+            echo ""
+            echo "## §4 test-the-test"
+            echo "Reverted: <what you reverted - commit SHA, file:hunk, or description>"
+            echo "Output:"
+            echo "<paste of cargo test failure output showing the test failed>"
+            echo "Restored: <commit SHA or 'reapplied'>"
+            echo ""
+            echo "See docs/dev-hygiene-playbook.md §4 and docs/adr/0016-mechanical-section-4-enforcement.md"
+            exit 1
+          fi
+          
+          # Extract the test-the-test section (everything after the heading until next ## or end)
+          SECTION=$(echo "$PR_BODY" | awk '/^## §4 test-the-test/{flag=1; next} /^## /{flag=0} flag')
+          
+          # Check for required fields
+          REVERTED=$(echo "$SECTION" | grep -i '^Reverted:' || true)
+          OUTPUT=$(echo "$SECTION" | grep -i '^Output:' || true)
+          RESTORED=$(echo "$SECTION" | grep -i '^Restored:' || true)
+          
+          FAILED=0
+          MISSING_FIELDS=""
+          
+          # Check Reverted field
+          if [ -z "$REVERTED" ]; then
+            MISSING_FIELDS="${MISSING_FIELDS}- Reverted:\n"
+            FAILED=1
+          else
+            # Check for placeholder text (case-insensitive)
+            REVERTED_VALUE=$(echo "$REVERTED" | sed 's/^Reverted://i' | xargs)
+            if echo "$REVERTED_VALUE" | grep -qiE '(TODO|tbd|n/a|<paste|pending)'; then
+              echo "❌ Reverted field contains placeholder text: $REVERTED_VALUE"
+              FAILED=1
+            elif [ -z "$REVERTED_VALUE" ]; then
+              echo "❌ Reverted field is empty"
+              FAILED=1
+            fi
+          fi
+          
+          # Check Output field
+          if [ -z "$OUTPUT" ]; then
+            MISSING_FIELDS="${MISSING_FIELDS}- Output:\n"
+            FAILED=1
+          else
+            # Extract multi-line output content after "Output:"
+            OUTPUT_CONTENT=$(echo "$SECTION" | awk '/^Output:/{flag=1; next} /^(Reverted:|Restored:)/{flag=0} flag')
+            
+            # Check for placeholder text
+            if echo "$OUTPUT_CONTENT" | grep -qiE '(TODO|tbd|n/a|<paste|pending)'; then
+              echo "❌ Output field contains placeholder text"
+              FAILED=1
+            # Check for actual failure markers
+            elif ! echo "$OUTPUT_CONTENT" | grep -qiE '(FAILED|panicked at|assertion|test result: FAILED|error\[)'; then
+              echo "❌ Output field must contain evidence of test failure"
+              echo "   Expected markers: FAILED, 'panicked at', 'assertion', 'test result: FAILED', or 'error['"
+              FAILED=1
+            elif [ -z "$OUTPUT_CONTENT" ] || [ $(echo "$OUTPUT_CONTENT" | wc -w) -lt 5 ]; then
+              echo "❌ Output field is empty or too short"
+              FAILED=1
+            fi
+          fi
+          
+          # Check Restored field
+          if [ -z "$RESTORED" ]; then
+            MISSING_FIELDS="${MISSING_FIELDS}- Restored:\n"
+            FAILED=1
+          else
+            # Check for placeholder text
+            RESTORED_VALUE=$(echo "$RESTORED" | sed 's/^Restored://i' | xargs)
+            if echo "$RESTORED_VALUE" | grep -qiE '(TODO|tbd|n/a|<paste|pending)'; then
+              echo "❌ Restored field contains placeholder text: $RESTORED_VALUE"
+              FAILED=1
+            elif [ -z "$RESTORED_VALUE" ]; then
+              echo "❌ Restored field is empty"
+              FAILED=1
+            fi
+          fi
+          
+          if [ $FAILED -ne 0 ]; then
+            if [ -n "$MISSING_FIELDS" ]; then
+              echo ""
+              echo "❌ §4 test-the-test section is incomplete"
+              echo ""
+              echo "Missing or invalid fields:"
+              echo -e "$MISSING_FIELDS"
+            fi
+            echo ""
+            echo "The §4 test-the-test section must include:"
+            echo "  Reverted: <non-placeholder description of what was reverted>"
+            echo "  Output: <multi-line failure output with FAILED/panicked/assertion/error markers>"
+            echo "  Restored: <non-placeholder description of restoration>"
+            echo ""
+            echo "For PRs adding tests for existing code with no production change, use 'Reverted: <function name>: deleted body, replaced with todo!()' format."
+            echo ""
+            echo "See docs/adr/0016-mechanical-section-4-enforcement.md for examples"
+            exit 1
+          fi
+          
+          echo "✅ §4 test-the-test section is complete and valid"

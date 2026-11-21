@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pane — Layout Options</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;color:#fff;font:13px/1.4 system-ui,sans-serif;padding:40px}
+h1{font-size:24px;font-weight:600;margin-bottom:32px;color:rgba(255,255,255,0.7)}
+.opt-label{font-size:16px;font-weight:600;margin:40px 0 12px;color:#00E4E4}
+.opt-label span{color:rgba(255,255,255,0.4);font-weight:400;font-size:13px;margin-left:8px}
+.frame{width:800px;height:500px;background:#0a0a0f;border:1px solid rgba(255,255,255,0.08);border-radius:8px;overflow:hidden;display:flex;position:relative}
+.sb{width:48px;min-width:48px;background:rgba(255,255,255,0.02);border-right:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;align-items:center;padding-top:16px;gap:12px}
+.sb .i{width:20px;height:20px;background:rgba(255,255,255,0.08);border-radius:4px}
+.card{height:120px;background:rgba(255,255,255,0.05);border-radius:6px;margin:6px 8px;padding:10px 12px 10px 0;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:6px 0 0 6px}
+.card.todo::before{background:#00E4E4}
+.card.inp::before{background:#FF8C00}
+.card.done::before{background:#00C853}
+.card.act{background:rgba(0,228,228,0.06)}
+.r1{display:flex;justify-content:space-between;padding-left:12px}
+.r1 .t{font-weight:600;font-size:13px}
+.r1 .f{color:rgba(255,255,255,0.25);font-size:12px}
+.pv{color:rgba(255,255,255,0.4);font-size:12px;padding-left:12px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mt{display:flex;gap:6px;align-items:center;padding-left:12px;flex-wrap:wrap}
+.p{font-size:10px;padding:2px 8px;border-radius:10px;white-space:nowrap}
+.pa{border:1px solid #00E4E4;color:#00E4E4}
+.ph{background:#FF4444;color:#fff}
+.pm{background:#FF8C00;color:#fff}
+.pl{background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.5)}
+.ps{background:#00E4E4;color:#0a0a0f;font-weight:600}
+.du{font-size:10px;color:rgba(255,255,255,0.35)}
+.card.compact{height:60px;padding:8px 10px 8px 0}
+.card.compact .pv{display:none}
+.ed{background:rgba(255,255,255,0.03);display:flex;flex-direction:column;overflow:hidden}
+.tb{height:36px;min-height:36px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;padding:0 12px;gap:8px}
+.tb .b{width:18px;height:18px;background:rgba(255,255,255,0.08);border-radius:3px}
+.eb{padding:16px;color:rgba(255,255,255,0.7);font-size:13px;line-height:1.7;overflow:auto;flex:1}
+.eb h2{font-size:16px;margin-bottom:12px;color:#fff}
+.lp{overflow-y:auto}
+.dv{width:1px;background:rgba(255,255,255,0.08)}
+.fc-wrap{position:relative;width:800px;height:500px}
+.fc-wrap .frame{width:100%;height:100%}
+.overlay{position:absolute;right:0;top:0;bottom:0;width:60%;background:#0d0d14;border-left:2px solid rgba(0,228,228,0.3);box-shadow:-8px 0 30px rgba(0,0,0,0.6);display:flex;flex-direction:column;z-index:2;border-radius:0 8px 8px 0}
+.overlay .lbl{position:absolute;top:8px;right:8px;font-size:10px;color:rgba(0,228,228,0.5)}
+.dh{width:4px;background:rgba(0,228,228,0.25);cursor:col-resize;position:relative}
+.dh::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:2px;height:32px;background:#00E4E4;border-radius:2px}
+.acc{flex:1;overflow-y:auto;padding:4px 0}
+.cx{background:rgba(255,255,255,0.05);border-radius:6px;margin:6px 8px;overflow:hidden}
+.cx .card{margin:0;border-radius:6px 6px 0 0}
+.ie{border-top:1px solid rgba(255,255,255,0.06);padding:12px 16px;height:200px;overflow:auto}
+.ie .tb{padding:0 0 8px;border:none;height:auto;min-height:auto}
+.ie .eb{padding:0}
+</style>
+</head>
+<body>
+<h1>Pane — Note Browser Layout Options</h1>
+
+<div class="opt-label">Option A <span>Classic Split (60/40)</span></div>
+<div class="frame">
+<div class="sb"><div class="i"></div><div class="i"></div><div class="i"></div><div class="i"></div></div>
+<div class="lp" style="width:320px;min-width:320px">
+<div class="card todo act"><div class="r1"><span class="t">Onboarding flow</span><span class="f">Design</span></div><div class="pv">Walk through the first-run experience and identify friction points for new users</div><div class="mt"><span class="p pa">Lane</span><span class="p ph">High</span><span class="du">Mar 12</span><span class="p ps">Subtasks 3</span></div></div>
+<div class="card inp"><div class="r1"><span class="t">API rate limiting</span><span class="f">Backend</span></div><div class="pv">Implement token bucket algorithm for public endpoints to prevent abuse</div><div class="mt"><span class="p pa">Stia</span><span class="p pm">Med</span><span class="du">Mar 15</span></div></div>
+<div class="card done"><div class="r1"><span class="t">Color system v2</span><span class="f">Design</span></div><div class="pv">Updated palette with accessible contrast ratios across all surfaces</div><div class="mt"><span class="p pa">Lane</span><span class="p pl">Low</span></div></div>
+<div class="card todo"><div class="r1"><span class="t">Search indexing</span><span class="f">Backend</span></div><div class="pv">Full-text search across notes with fuzzy matching and typo tolerance</div><div class="mt"><span class="p ph">High</span><span class="du">Mar 18</span><span class="p ps">Subtasks 5</span></div></div>
+</div>
+<div class="dv"></div>
+<div class="ed" style="flex:1"><div class="tb"><div class="b"></div><div class="b"></div><div class="b"></div></div><div class="eb"><h2>Onboarding flow</h2><p>The first-run experience needs to feel lightweight. Users should be able to create their first note within 10 seconds of opening the app. No sign-up walls, no tour modals.</p><p style="margin-top:12px">Key steps: welcome screen → create first note → show card preview → introduce folders. Keep it to four screens max. Animation between steps should be 200ms ease-out.</p><p style="margin-top:12px">Consider a skip option for power users who want to jump straight to the workspace.</p></div></div>
+</div>
+
+<div class="opt-label">Option B <span>Narrow List + Wide Editor (30/70)</span></div>
+<div class="frame">
+<div class="sb"><div class="i"></div><div class="i"></div><div class="i"></div><div class="i"></div></div>
+<div class="lp" style="width:240px;min-width:240px">
+<div class="card compact todo act"><div class="r1"><span class="t">Onboarding flow</span><span class="f">Design</span></div><div class="pv"></div><div class="mt"><span class="p pa">Lane</span><span class="p ph">High</span><span class="du">Mar 12</span></div></div>
+<div class="card compact inp"><div class="r1"><span class="t">API rate limiting</span><span class="f">Backend</span></div><div class="pv"></div><div class="mt"><span class="p pa">Stia</span><span class="p pm">Med</span><span class="du">Mar 15</span></div></div>
+<div class="card compact done"><div class="r1"><span class="t">Color system v2</span><span class="f">Design</span></div><div class="pv"></div><div class="mt"><span class="p pa">Lane</span><span class="p pl">Low</span></div></div>
+<div class="card compact todo"><div class="r1"><span class="t">Search indexing</span><span class="f">Backend</span></div><div class="pv"></div><div class="mt"><span class="p ph">High</span><span class="du">Mar 18</span></div></div>
+<div class="card compact"><div class="r1"><span class="t">Meeting notes</span><span class="f">Cabinet</span></div><div class="pv"></div><div class="mt"><span class="du">Mar 10</span></div></div>
+</div>
+<div class="dv"></div>
+<div class="ed" style="flex:1"><div class="tb"><div class="b"></div><div class="b"></div><div class="b"></div></div><div class="eb"><h2>Onboarding flow</h2><p>The first-run experience needs to feel lightweight. Users should be able to create their first note within 10 seconds of opening the app. No sign-up walls, no tour modals.</p><p style="margin-top:12px">Key steps: welcome screen → create first note → show card preview → introduce folders. Keep it to four screens max. The wider editor gives more room for long-form writing and embedded content.</p><p style="margin-top:12px">Trade-off: card preview text is hidden in the narrow list. You rely on titles and metadata to find notes. Works well when titles are descriptive.</p></div></div>
+</div>
+
+<div class="opt-label">Option C <span>Overlay / Drawer</span></div>
+<div class="fc-wrap">
+<div class="frame" style="width:100%;height:100%">
+<div class="sb"><div class="i"></div><div class="i"></div><div class="i"></div><div class="i"></div></div>
+<div class="lp" style="flex:1;display:flex;flex-wrap:wrap;align-content:flex-start;padding:4px">
+<div class="card todo act" style="width:calc(50% - 16px);flex-shrink:0"><div class="r1"><span class="t">Onboarding flow</span><span class="f">Design</span></div><div class="pv">Walk through the first-run experience and identify friction points for new users</div><div class="mt"><span class="p pa">Lane</span><span class="p ph">High</span><span class="du">Mar 12</span><span class="p ps">Subtasks 3</span></div></div>
+<div class="card inp" style="width:calc(50% - 16px);flex-shrink:0"><div class="r1"><span class="t">API rate limiting</span><span class="f">Backend</span></div><div class="pv">Implement token bucket algorithm for public endpoints to prevent abuse</div><div class="mt"><span class="p pa">Stia</span><span class="p pm">Med</span><span class="du">Mar 15</span></div></div>
+<div class="card done" style="width:calc(50% - 16px);flex-shrink:0"><div class="r1"><span class="t">Color system v2</span><span class="f">Design</span></div><div class="pv">Updated palette with accessible contrast ratios across all surfaces</div><div class="mt"><span class="p pa">Lane</span><span class="p pl">Low</span></div></div>
+<div class="card todo" style="width:calc(50% - 16px);flex-shrink:0"><div class="r1"><span class="t">Search indexing</span><span class="f">Backend</span></div><div class="pv">Full-text search across notes with fuzzy matching and typo tolerance</div><div class="mt"><span class="p ph">High</span><span class="du">Mar 18</span><span class="p ps">Subtasks 5</span></div></div>
+</div>
+</div>
+<div class="overlay"><div class="lbl">▸ editor drawer</div><div class="tb"><div class="b"></div><div class="b"></div><div class="b"></div></div><div class="eb" style="padding:16px;color:rgba(255,255,255,0.7);line-height:1.7;flex:1;overflow:auto"><h2 style="font-size:16px;margin-bottom:12px;color:#fff">Onboarding flow</h2><p>The first-run experience needs to feel lightweight. Users should create their first note within 10 seconds.</p><p style="margin-top:12px">This drawer slides in from the right when a card is clicked. Cards remain visible behind. Click outside or press Escape to dismiss.</p><p style="margin-top:12px">Good for: browse-heavy workflows. Bad for: heavy writing sessions where the overlay feels temporary.</p></div></div>
+</div>
+
+<div class="opt-label">Option D <span>Master-Detail with Resizable</span></div>
+<div class="frame">
+<div class="sb"><div class="i"></div><div class="i"></div><div class="i"></div><div class="i"></div></div>
+<div class="lp" style="width:300px;min-width:300px">
+<div class="card todo act"><div class="r1"><span class="t">Onboarding flow</span><span class="f">Design</span></div><div class="pv">Walk through the first-run experience and identify friction points for new users</div><div class="mt"><span class="p pa">Lane</span><span class="p ph">High</span><span class="du">Mar 12</span><span class="p ps">Subtasks 3</span></div></div>
+<div class="card inp"><div class="r1"><span class="t">API rate limiting</span><span class="f">Backend</span></div><div class="pv">Implement token bucket algorithm for public endpoints to prevent abuse</div><div class="mt"><span class="p pa">Stia</span><span class="p pm">Med</span><span class="du">Mar 15</span></div></div>
+<div class="card done"><div class="r1"><span class="t">Color system v2</span><span class="f">Design</span></div><div class="pv">Updated palette with accessible contrast ratios across all surfaces</div><div class="mt"><span class="p pa">Lane</span><span class="p pl">Low</span></div></div>
+<div class="card todo"><div class="r1"><span class="t">Search indexing</span><span class="f">Backend</span></div><div class="pv">Full-text search across notes with fuzzy matching and typo tolerance</div><div class="mt"><span class="p ph">High</span><span class="du">Mar 18</span><span class="p ps">Subtasks 5</span></div></div>
+</div>
+<div class="dh"></div>
+<div class="ed" style="flex:1"><div class="tb"><div class="b"></div><div class="b"></div><div class="b"></div></div><div class="eb"><h2>Onboarding flow</h2><p>The first-run experience needs to feel lightweight. Users should be able to create their first note within 10 seconds.</p><p style="margin-top:12px">The teal drag handle between list and editor lets you resize panels. Drag left for more editor room, right for a wider card list. Position persists per-workspace.</p><p style="margin-top:12px">Most flexible option — users tune the layout to their preference.</p></div></div>
+</div>
+
+<div class="opt-label">Option E <span>Stacked / Accordion</span></div>
+<div class="frame">
+<div class="sb"><div class="i"></div><div class="i"></div><div class="i"></div><div class="i"></div></div>
+<div class="acc">
+<div class="card todo" style="margin:6px 8px"><div class="r1"><span class="t">API rate limiting</span><span class="f">Backend</span></div><div class="pv">Implement token bucket algorithm for public endpoints to prevent abuse</div><div class="mt"><span class="p pa">Stia</span><span class="p pm">Med</span><span class="du">Mar 15</span></div></div>
+<div class="cx">
+<div class="card todo act" style="margin:0;border-radius:6px 6px 0 0"><div class="r1"><span class="t">Onboarding flow</span><span class="f">Design</span></div><div class="pv">Walk through the first-run experience and identify friction points</div><div class="mt"><span class="p pa">Lane</span><span class="p ph">High</span><span class="du">Mar 12</span><span class="p ps">Subtasks 3</span></div></div>
+<div class="ie"><div class="tb" style="height:auto;min-height:auto;border:none;padding:0 0 8px"><div class="b"></div><div class="b"></div><div class="b"></div></div><div style="color:rgba(255,255,255,0.7);line-height:1.7"><p>The first-run experience needs to feel lightweight. Users should create their first note within 10 seconds.</p><p style="margin-top:8px">Key steps: welcome → create note → card preview → folders. Four screens max.</p><p style="margin-top:8px">Accordion expands inline — no separate panel. Good for quick edits, less ideal for long-form.</p></div></div>
+</div>
+<div class="card done" style="margin:6px 8px"><div class="r1"><span class="t">Color system v2</span><span class="f">Design</span></div><div class="pv">Updated palette with accessible contrast ratios across all surfaces</div><div class="mt"><span class="p pa">Lane</span><span class="p pl">Low</span></div></div>
+<div class="card inp" style="margin:6px 8px"><div class="r1"><span class="t">Search indexing</span><span class="f">Backend</span></div><div class="pv">Full-text search across notes with fuzzy matching and typo tolerance</div><div class="mt"><span class="p ph">High</span><span class="du">Mar 18</span></div></div>
+</div>
+</div>
+
+</body>
+</html>

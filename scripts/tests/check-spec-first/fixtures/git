@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# =============================================================================
+# fixtures/git — fake `git` CLI for test-real-wiring.sh, so the actual
+# run: block's `CHANGED=$(git diff --name-only origin/main...HEAD)` line
+# can be driven with a controlled file list instead of this repo's real
+# diff (which has nothing to do with whatever shape a test case wants to
+# simulate).
+# =============================================================================
+# Driven by:
+#   FAKE_CHANGED — newline-separated paths to print for `git diff
+#                  --name-only origin/main...HEAD` (any other `git diff`
+#                  invocation shape is intentionally unsupported — this
+#                  fake only needs to cover the one call the workflow
+#                  makes).
+#
+# Prepended onto PATH only for the duration of test-real-wiring.sh's own
+# run; never installed or referenced by the production workflow/script.
+# =============================================================================
+set -euo pipefail
+
+case "$1" in
+  diff)
+    printf '%s\n' "${FAKE_CHANGED:-}"
+    ;;
+  *)
+    echo "fixtures/git: unexpected invocation: $*" >&2
+    exit 1
+    ;;
+esac

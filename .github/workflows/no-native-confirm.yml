@@ -1,0 +1,36 @@
+name: CI — No Native confirm()
+
+# =============================================================================
+# #3044 item 6: the pinned Tauri dialog plugin has no `confirm` command —
+# native `confirm(...)` (bare or `window.confirm(...)`) never asks the user
+# anything in this app's WebView; it returns immediately and the calling
+# code carries on as if answered. Three call sites (TaskEditModal.svelte,
+# TaskFullPage.svelte, TaskList.svelte) were still using it when this gate
+# was added — fixed in the same commit. `alert()` is NOT forbidden — it
+# works correctly in this WebView.
+#
+# Logic lives in scripts/check-no-native-confirm.sh (thin workflow, same
+# shape as scripts/check-spec-first.sh / .github/workflows/spec-first.yml,
+# #3015) — independently testable via
+# scripts/tests/check-no-native-confirm/run-tests.sh, which this workflow
+# runs first as a self-check before scanning the real tree.
+# =============================================================================
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  no-native-confirm:
+    name: No native confirm( in src/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Self-check — guard unit tests (fixtures, proves it catches a planted violation)
+        run: bash scripts/tests/check-no-native-confirm/run-tests.sh
+
+      - name: Check for native confirm( in src/
+        run: bash scripts/check-no-native-confirm.sh
