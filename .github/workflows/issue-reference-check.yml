@@ -5,13 +5,35 @@ on:
     types: [opened, edited, synchronize]
 
 permissions:
+  contents: read
   pull-requests: read
 
 jobs:
   check-issue-reference:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # #3260 decision 1: a PR whose diff touches only recipes/ is exempt from
+      # the issue-reference rule — path-scoped, not contributor-scoped. Any
+      # PR that touches anything outside recipes/, from anyone, still needs
+      # one. Same changed-file-list call reed-gate.yml already makes.
+      - name: Check if diff is recipes-only
+        id: recipes-only
+        run: |
+          CHANGED=$(git diff --name-only origin/main...HEAD)
+          NON_RECIPES=$(echo "$CHANGED" | grep -v -E '^recipes/' || true)
+          if [ -z "$NON_RECIPES" ]; then
+            echo "recipes_only=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Diff is recipes/-only — issue reference not required"
+          else
+            echo "recipes_only=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check for Issue Reference
+        if: steps.recipes-only.outputs.recipes_only != 'true'
         uses: actions/github-script@v7
         with:
           script: |

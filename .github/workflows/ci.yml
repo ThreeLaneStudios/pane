@@ -15,9 +15,26 @@ on:
     branches: [main]
     # No paths filter here — must always report status
 
+permissions:
+  contents: read
+
 jobs:
   changes:
     runs-on: ubuntu-latest
+    # #3207 correction: dorny/paths-filter@v3 on a pull_request event calls
+    # the GitHub API's listFiles for the PR (confirmed live: PR #3259's own
+    # first run under this workflow's new contents-read-only block failed
+    # here with "Resource not accessible by integration", with no
+    # pull-requests: read to cover it). Job-level permissions REPLACE,
+    # not merge with, the workflow-level block above -- unlike
+    # rust-tests.yml/dmg-swap-test.yml's identical `changes` job (which
+    # declare pull-requests: read alone), this job also calls
+    # actions/checkout@v4 first, so it needs contents: read restated here
+    # too or checkout itself 403s ("Repository not found", confirmed live
+    # on the first attempt at this fix, job-level pull-requests: read only).
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
     steps:

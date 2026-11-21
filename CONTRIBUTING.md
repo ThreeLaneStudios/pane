@@ -10,6 +10,8 @@ GitHub is the source of truth. Decisions live on issues, not in chat. If a chang
 
 We build one thing at a time. A feature goes through scope, build, audit, and merge in that order, and a new build does not start until the previous one lands. This keeps the main branch always releasable and keeps review honest. If your pull request sits for a bit while something else finishes, that is the queue, not a verdict.
 
+The rules below are the summary. [docs/dev-hygiene-playbook.md](docs/dev-hygiene-playbook.md) is the full version, with the reasoning behind each gate.
+
 ## Before you start
 
 Look for an existing issue first. If there is one, comment that you are taking it so nobody else does. If there is not, open one before writing code, and keep it to one thing: what is wrong or missing, how to reproduce it or where it would live, and a `Spec Section:` line. Bugs with reproduction steps and a version number get fixed fastest.
@@ -56,7 +58,7 @@ Branch from `main`. Keep the change to what the issue asked for; if you find som
 
 ## Pull requests
 
-Open the pull request against `main`. The body must reference the issue it closes or relates to (`Closes #123`, `Relates to #123`); a check fails without one. Say what changed, how you verified it, and anything the reviewer should look at first.
+Open the pull request against `main`. The body must reference the issue it closes or relates to (`Closes #123`, `Relates to #123`); a check fails without one. Pull requests that touch only files under `recipes/` are exempt from this requirement — a recipe submission does not need an issue reference. Any pull request that touches anything outside `recipes/`, including from first-time outside contributors, still needs one. Say what changed, how you verified it, and anything the reviewer should look at first.
 
 CI runs on every pull request. The checks that matter most:
 

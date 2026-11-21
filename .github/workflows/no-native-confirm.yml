@@ -22,6 +22,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   no-native-confirm:
     name: No native confirm( in src/

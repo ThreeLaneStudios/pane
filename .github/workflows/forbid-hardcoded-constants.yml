@@ -52,6 +52,9 @@ env:
   G7_MODE: fail    # landed at fail — #2215 removes the only existing violation; catches DOM listener for Tauri-emitted events
   G8_MODE: fail    # landed at fail — #3050 PR 7 fixes the only existing violation (smoke-launch.sh) in the same PR
 
+permissions:
+  contents: read
+
 jobs:
   forbid-hardcoded-constants:
     name: Forbid Hardcoded Constants (G1–G5)

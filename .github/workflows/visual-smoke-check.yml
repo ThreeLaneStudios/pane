@@ -8,6 +8,17 @@ on:
 jobs:
   visual-smoke-check:
     runs-on: ubuntu-latest
+    # #3207 audit: this job is the only writer in the repo with zero
+    # permissions coverage — it posts/deletes Gate 4d PR comments via
+    # `gh pr comment` / `gh api ... -X DELETE`. Job-level (not
+    # workflow-level) because the second job below (sidebar-overlay-
+    # visual-regression) never writes to GitHub state and doesn't need
+    # pull-requests: write — same job-level-override pattern already used
+    # in this repo by release-publish.yml/updater-release-assets.yml for
+    # the one job out of several that needs elevated scope.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -15,6 +26,15 @@ jobs:
 
       - name: Check Gate 4d requirement
         run: |
+          # #3207: fail loudly, not silently, once the repo flips to a
+          # read-only GITHUB_TOKEN default. Without this, a 403 on
+          # `gh pr comment`/`gh api ... DELETE` below would be swallowed by
+          # the script's own unconditional final `exit 0` ("comment gate,
+          # not a merge blocker"), reporting green while Gate 4d quietly
+          # stopped posting/clearing comments. set -e must be above every
+          # writing call in this step so the first one that 403s halts the
+          # script instead of limping on to the explicit exit 0 at the end.
+          set -e
           # Get changed files in this PR
           CHANGED=$(git diff --name-only origin/main...HEAD)
           

@@ -8,7 +8,16 @@ Format: [Semantic Versioning](https://semver.org/). Each entry includes the vers
 
 ## [Unreleased]
 
+### Added
+- `.github/FUNDING.yml`, pointing GitHub's Sponsor button at ThreeLaneStudios (#3106).
+- `recipes/REVIEW-CHECKLIST.md` gains a 14th checklist item flagging unpinned remote fetches/installs. The "Submit a recipe" issue form (`.github/ISSUE_TEMPLATE/recipe-submission.yml`) gains a required "What does this touch, in your own words?" field, pasted verbatim into a recipe's `## What it touches` section rather than composed from the existing `touches-*` fields (#3262).
+
+### Documentation
+- `docs/release-runbook.md` states that publishing a release is Matt's manual click alone; agents never publish a draft (#3106).
+- `recipes/README.md` no longer hedges `agents/` and `jobs/` as provisional folder names; they are final (#3262).
+
 ### Fixed
+- `recipes/RECIPE-TEMPLATE.md`'s `## What it touches` comment cited the wrong checklist item for the touches-matching rule; it now cites the correct item and names both the PR and issue-form submission routes (#3262).
 - `pnpm build` failed on a fresh checkout because the prebuild hook's spec-status check pointed at a spec file that no longer exists. The check is removed from `scripts/pre-build.sh`, the same stale reference is removed from `scripts/spec-audit.sh`, and the now-unreferenced `scripts/check-spec-status.sh` is deleted (#3243).
 - `scripts/check-spec-first.sh`'s core-behavioral file list matched bare filenames as path prefixes instead of whole filenames, so a deleted or renamed file sharing a core filename's prefix (for example `database.rs.before_composite_pk`) was wrongly classified as a core behavioral change. The bare-filename entries are now end-anchored; the directory-prefix entries are unchanged. The spec-first source-change detector also did not recognize `src-gateway/src/` as a source path, so gateway-only PRs skipped the spec-first discipline check entirely; `src-gateway/src/` is now included in that detector (#3234, #3198). The `spec-skip:` and `spec-covered-by:` marker checks in the same script matched the marker text anywhere in the PR body instead of only at the start of a line, and a stale comment referencing a cross-reference pattern in the spec-first workflow (removed by an earlier refactor) is corrected.
 - The CHANGELOG-skip and skip-approval marker checks in `.github/workflows/spec-first.yml`, the gate-4d walkthrough markers in `.github/workflows/visual-smoke-check.yml`, and the §4 test-the-test section checks in `.github/workflows/section-4-enforcement.yml` all matched their marker text anywhere in the PR body instead of only at the start of a line, so a PR description that merely explains or quotes a marker in a sentence could satisfy the check that marker is meant to gate. Every one of these checks is now anchored to the start of a line (optionally after leading whitespace), so only an actual declared marker counts; a genuine marker at the start of a line still matches exactly as before. A stale workflow comment in `spec-first.yml` citing a test file that was never part of this repository's history is also corrected to point at where the real wiring tests live (#3235).
@@ -32,6 +41,21 @@ Format: [Semantic Versioning](https://semver.org/). Each entry includes the vers
 - The macOS CI release job builds `Pane.app` as a universal (`arm64`+`x86_64`) binary and packages the DMG through `scripts/lib/dmg.sh`'s shared `hdiutil` helpers instead of calling `hdiutil` directly, matching `scripts/build.sh`. The app itself is now notarized and stapled before packaging, not only the DMG, and a committed `.DS_Store` asset gives the shipped DMG the same window layout `scripts/build.sh` already produces. The artifact is named `Pane_X.Y.Z.dmg` (#3247, #3049).
 - `scripts/build.sh` no longer reads a local Tauri signing key or `.env` file; it always produces an unsigned, non-notarized dev build and prints an explicit notice saying so. Signed, notarized builds now come exclusively from `release-publish.yml`'s self-hosted runner, where the eight signing secrets live in GitHub only. This supersedes the local-signing-password guard #3237 added three days ago (closing #3226): that guard is no longer needed because the local-signing path it guarded no longer exists (#3239).
 - Five job-level `env.PATH` lines on the self-hosted macOS ARM64 runner (`nightly-tests.yml`, two in `release-publish.yml`, `updater-release-assets.yml`, `e2e.yml`) hardcoded a `.cargo/bin` path under a nonexistent developer home directory, a user that does not exist on the runner. This is what made `cargo` resolve to exit 127 on the first real run of the signed release path (tag `v1.0.86-dev`, run 43945879372), before signing or notarization could execute. Fixed identically at all five: the `env.PATH` now keeps only the username-free entries (`/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`, `/bin`, `/usr/sbin`, `/sbin`), and a new first step after checkout writes the real `$HOME/.cargo/bin` to `$GITHUB_PATH` from a `run:` step, where `$HOME` actually expands; GitHub Actions prepends `$GITHUB_PATH` entries to every later step's `PATH` in that job, so step order and precedence match the old hardcoded line exactly (#3244).
+
+### Security
+- `picomatch` 4.0.7 has a second, distinct ReDoS advisory (GHSA-fc5q-39xc-vjpf / CVE-2026-112366, ReDoS via single-branch repeated extglob patterns; pnpm advisory 1247710; high) with no patched version available anywhere upstream. Pulled only transitively, via `svelte-check`/`vite`/`vitest` -> `fdir`/`tinyglobby` -> `picomatch`, for build/dev/test tooling only. Exempted via a dated `docs/security/dependency-audit-exceptions.yml` entry (review_by 2027-01-15), added alongside the existing, differently-scoped `picomatch` entry (1115554) rather than merged into it.
+
+### Security
+- internal: Workflows that write to GitHub (PR comments) or otherwise mutate repository state now declare an explicit `permissions:` block instead of relying on the repository-wide default; every other workflow declares `contents: read`. `visual-smoke-check.yml`'s Gate 4d comment step now fails loudly instead of silently if it cannot post or delete a comment (#3207).
+
+### Documentation
+- internal: CONTRIBUTING.md now points to `docs/dev-hygiene-playbook.md` for the full detail behind its process summary (#3106).
+
+### Added
+- `recipes/` — a home for community-submitted recipes, with an `agents/` and a `jobs/` subfolder (names provisional), a `RECIPE-TEMPLATE.md`, a `README.md` explaining how to use and submit a recipe, and a public `REVIEW-CHECKLIST.md`. A "Submit a recipe" issue form (`.github/ISSUE_TEMPLATE/recipe-submission.yml`) carries the same fields for non-coders (#3260).
+
+### Infrastructure
+- `reed-gate.yml`'s `CORE_PATHS` now includes `recipes/`, so a recipe pull request needs the `reed-reviewed` label before it can merge, same as every other core path. `check-issue-reference` now exempts a pull request whose diff touches only `recipes/` from the issue-reference requirement; any diff touching anything else, from anyone, still needs one. `startup-smoke.yml`'s existing docs-only exclusion now also covers `recipes/`, taking the same fast step-skip path docs-only changes already take (#3260).
 
 ## [1.0.86] - 2026-11-16
 
