@@ -96,7 +96,7 @@ If post-launch signals indicate verification is needed (synthetic-account abuse,
 
 ### Negative
 
-- **Typo'd-email customers can't self-recover.** A customer who pays with `mtt@paneapp.ai` instead of `admin@paneapp.ai` cannot sign in to Pane. Support intervention required (cancel + refund + re-signup). At launch volume this is acceptable; at scale it becomes a real cost.
+- **Typo'd-email customers can't self-recover.** A customer who pays with `admn@paneapp.ai` instead of `admin@paneapp.ai` cannot sign in to Pane. Support intervention required (cancel + refund + re-signup). At launch volume this is acceptable; at scale it becomes a real cost.
 - **Synthetic-account abuse is bounded only by Stripe.** Without verification, an attacker could create accounts at any email (typo'd, throwaway, someone else's). Stripe's fraud checks bound this — payments still require valid cards — but the abuse vector is wider than Posture A.
 - **Future migration to Posture A is non-trivial.** Existing customers were created with `email_confirmed_at` populated. A future enforcement of verification needs a "prompt existing customers to verify" flow that doesn't lock them out of Pane during the prompt period. Migration plan is post-launch concern; documenting v1 baseline now makes future planning easier.
 
