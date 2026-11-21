@@ -13,6 +13,7 @@ Format: [Semantic Versioning](https://semver.org/). Each entry includes the vers
 - `recipes/REVIEW-CHECKLIST.md` gains a 14th checklist item flagging unpinned remote fetches/installs. The "Submit a recipe" issue form (`.github/ISSUE_TEMPLATE/recipe-submission.yml`) gains a required "What does this touch, in your own words?" field, pasted verbatim into a recipe's `## What it touches` section rather than composed from the existing `touches-*` fields (#3262).
 
 ### Documentation
+- `docs/adr/0034-paneapp-ai-email-verification-posture.md`'s typo'd-email example used a typo'd address (`mtt@paneapp.ai`) that no longer corresponded to the correct address it was being contrasted with (`admin@paneapp.ai`); it now reads `admn@paneapp.ai` instead of `admin@paneapp.ai`, a dropped-character typo of the correct address (#441).
 - `docs/release-runbook.md` states that publishing a release is Matt's manual click alone; agents never publish a draft (#3106).
 - `recipes/README.md` no longer hedges `agents/` and `jobs/` as provisional folder names; they are final (#3262).
 
