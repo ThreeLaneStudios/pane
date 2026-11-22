@@ -12,6 +12,9 @@ Format: [Semantic Versioning](https://semver.org/). Each entry includes the vers
 - `.github/FUNDING.yml`, pointing GitHub's Sponsor button at ThreeLaneStudios (#3106).
 - `recipes/REVIEW-CHECKLIST.md` gains a 14th checklist item flagging unpinned remote fetches/installs. The "Submit a recipe" issue form (`.github/ISSUE_TEMPLATE/recipe-submission.yml`) gains a required "What does this touch, in your own words?" field, pasted verbatim into a recipe's `## What it touches` section rather than composed from the existing `touches-*` fields (#3262).
 
+### Removed
+- `.github/workflows/issue-spec-check.yml` and `.github/workflows/issue-triage.yml`, the two issue-opened workflows that auto-labeled and commented on new issues over a missing spec section or a missing `launch-blocking`/`post-launch` label. `CONTRIBUTING.md`'s description of that automation is updated to match. The `launch-blocking`, `post-launch`, `needs-triage`, and `needs-spec-section` labels themselves are unchanged (#443).
+
 ### Documentation
 - `docs/adr/0034-paneapp-ai-email-verification-posture.md`'s typo'd-email example used a typo'd address (`mtt@paneapp.ai`) that no longer corresponded to the correct address it was being contrasted with (`admin@paneapp.ai`); it now reads `admn@paneapp.ai` instead of `admin@paneapp.ai`, a dropped-character typo of the correct address (#441).
 - `docs/release-runbook.md` states that publishing a release is Matt's manual click alone; agents never publish a draft (#3106).
