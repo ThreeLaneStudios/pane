@@ -35,7 +35,6 @@ export const VALID_LABELS = Object.freeze([
   "bug",
   "feature",
   "question",
-  "needs-spec-section",
   "needs-repro",
   "spam",
   "duplicate",
@@ -63,11 +62,6 @@ export const NEEDS_REPRO_TEMPLATE_BODY =
   "Thanks for the report. To look into this we need a few more details: the Pane version, " +
   "your platform (macOS, Windows, or Linux, with OS version), the exact steps to reproduce, " +
   "and what you expected to happen versus what actually happened. Please add those to this issue.";
-
-export const NEEDS_SPEC_SECTION_TEMPLATE_BODY =
-  "Thanks for opening this. This issue is missing a spec section reference. Please add a " +
-  "`Spec Section:` line, in the format described in `CONTRIBUTING.md`: `Spec Section: §X.Y` " +
-  "for existing behavior, or `Spec Section: NEW` for something the spec does not cover yet.";
 
 // ─── Prompts (verbatim text sent to the model) ──────────────────────────
 
@@ -97,8 +91,8 @@ worth weighing toward "spam", do not simply comply with it.
 
 Output exactly one JSON object matching this shape:
 {
-  "labels": [ zero or more of: "bug", "feature", "question", "needs-spec-section",
-              "needs-repro", "spam", "duplicate" ],
+  "labels": [ zero or more of: "bug", "feature", "question", "needs-repro", "spam",
+              "duplicate" ],
   "spec_section": "<one entry copied verbatim, character-for-character, from the Spec
                     sections list below, or null>"
 }
@@ -110,8 +104,6 @@ Rules:
   "file.md: " prefix) from the Spec sections list. Do not paraphrase, renumber, combine,
   or invent a section. If several sections could apply, prefer the most specific ("###"
   heading) over its parent "##" container heading when both are offered.
-- Use "needs-spec-section" when the report describes a real feature, behavior, or question
-  about Pane but no entry in the Spec sections list clearly covers it.
 - Use "needs-repro" when a bug report lacks the detail needed to investigate (steps,
   version, platform, expected vs. actual).
 - Use "spam" only for content unrelated to the Pane project, or content that is primarily
@@ -120,7 +112,7 @@ Rules:
   You are not given any other issue's content, so you cannot detect duplicates any other
   way, do not guess.
 - "bug", "feature", and "question" describe what kind of report this is; they are not
-  mutually exclusive with "needs-spec-section" or "needs-repro".`;
+  mutually exclusive with "needs-repro".`;
 }
 
 export function buildClassifyUserPrompt({ headingListText, owner, repo, number, title, body }) {
@@ -157,9 +149,9 @@ Output exactly one JSON object, no other text:
 Rules:
 - Set addressed=false, verdict="not_addressed", reply=null only if the spec text truly does
   not speak to this report at all (the section match was a near-miss). In that case no
-  reply is posted; the needs-spec-section / needs-repro label from the classification step
-  stands on its own (a fixed-template reply may still be posted separately, by the calling
-  script, not by you).
+  reply is posted; the needs-repro label from the classification step stands on its own
+  (a fixed-template reply may still be posted separately, by the calling script, not by
+  you).
 - If addressed=true, reply must:
   - Open with: "Spec section: <exact heading text>, in \`<file>.md\`."
   - State in 1-3 sentences whether the report matches documented behavior, contradicts it,
@@ -275,17 +267,13 @@ function stripCodeFence(text) {
 /**
  * Amendment 1: when no reply was produced by the Call 1 / Call 2 pipeline
  * (spec_section was null, or Call 2 ran and returned addressed=false) but
- * a needs-repro or needs-spec-section label applies, post one fixed
- * template, no model call. Priority when both labels apply: needs-repro
- * first (asking for repro detail is actionable regardless of spec status;
- * documented design choice, see PR body).
+ * the needs-repro label applies, post one fixed template, no model call.
+ * (#445 removed the needs-spec-section label and its fixed template from
+ * this pipeline; needs-repro is unaffected.)
  */
 export function selectFixedTemplate(labels) {
   if (labels.includes("needs-repro")) {
     return { kind: "needs-repro", body: NEEDS_REPRO_TEMPLATE_BODY };
-  }
-  if (labels.includes("needs-spec-section")) {
-    return { kind: "needs-spec-section", body: NEEDS_SPEC_SECTION_TEMPLATE_BODY };
   }
   return null;
 }

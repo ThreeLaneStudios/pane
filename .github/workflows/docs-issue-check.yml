@@ -43,8 +43,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 title: `⚠️ Spec changed without issue reference — ${new Date().toISOString().split('T')[0]}`,
-                body: `The following commit(s) modified \`docs/\` without an issue reference (\`#NNN\`) in the commit message:\n\n${details}\n\n**Action required:** Link these changes to an issue, or confirm they were intentional.\n\nSee [CONTRIBUTING.md](https://github.com/ThreeLaneStudios/pane/blob/main/CONTRIBUTING.md) for the spec-driven workflow.`,
-                labels: ['needs-spec-section']
+                body: `The following commit(s) modified \`docs/\` without an issue reference (\`#NNN\`) in the commit message:\n\n${details}\n\n**Action required:** Link these changes to an issue, or confirm they were intentional.\n\nSee [CONTRIBUTING.md](https://github.com/ThreeLaneStudios/pane/blob/main/CONTRIBUTING.md) for the spec-driven workflow.`
               });
               
               console.log(`⚠️ Flagged ${flagged.length} commit(s) without issue reference`);

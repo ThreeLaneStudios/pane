@@ -6,9 +6,10 @@ name: Issue Triage (AI)
 # with GITHUB_TOKEN, calling the Anthropic API directly with the
 # TRIAGE_API_KEY repo secret. Scope: Reed's audited comment on #3227
 # (https://github.com/ThreeLaneStudios/pane/issues/3227#issuecomment-6856537748),
-# plus Matt's two amendments (fixed-template replies for needs-repro /
-# needs-spec-section when the model pipeline produces no reply; no em
-# dashes anywhere in any prompt or reply text).
+# plus Matt's two amendments (fixed-template replies for needs-repro
+# when the model pipeline produces no reply; no em dashes anywhere in any
+# prompt or reply text). #445 removed the needs-spec-section label and its
+# fixed template from this pipeline; needs-repro is unaffected.
 #
 # SHIPS DISABLED. The `schedule:` trigger below is commented out on
 # purpose, so no scheduled run can fire until a human edits this file.

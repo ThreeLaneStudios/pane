@@ -12,15 +12,6 @@ body:
         before it merges.
 
   - type: input
-    id: spec-section
-    attributes:
-      label: Spec Section
-      description: "Recipes aren't governed by docs/spec/. Leave this as N/A."
-      placeholder: "N/A — recipes/ is not governed by docs/spec/"
-    validations:
-      required: true
-
-  - type: input
     id: recipe-name
     attributes:
       label: Recipe name
