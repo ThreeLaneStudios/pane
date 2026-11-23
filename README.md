@@ -1,6 +1,8 @@
 # Pane
 
-**A local-first workspace where you build your agents and work on projects with them.**
+**The open-source app for running AI agents you own.**
+
+You decide who sees your data, not a big tech company.
 
 Pane is an open-source desktop app where you and your AI agents work in the same place. Build agents from scratch (a strategist, a developer, an auditor, a writer, or anything else) or bring the ones you already run on OpenClaw.
 

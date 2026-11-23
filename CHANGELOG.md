@@ -17,6 +17,7 @@ Format: [Semantic Versioning](https://semver.org/). Each entry includes the vers
 - Every place that applied or read the `needs-spec-section` label: `docs-issue-check.yml` no longer applies it, the dormant `issue-triage-ai.yml`/`issue-triage-ai.mjs` pipeline no longer classifies or replies with it, `scripts/spec-audit.sh` drops its label-based query, and the "Submit a recipe" issue form's unused `Spec Section: N/A` field is removed. The label itself is unchanged; Matt deletes it separately (#445).
 
 ### Documentation
+- `README.md`'s opening bold tagline is replaced with "The open-source app for running AI agents you own." and a new line below it reads "You decide who sees your data, not a big tech company." (#447).
 - `docs/adr/0034-paneapp-ai-email-verification-posture.md`'s typo'd-email example used a typo'd address (`mtt@paneapp.ai`) that no longer corresponded to the correct address it was being contrasted with (`admin@paneapp.ai`); it now reads `admn@paneapp.ai` instead of `admin@paneapp.ai`, a dropped-character typo of the correct address (#441).
 - `docs/release-runbook.md` states that publishing a release is Matt's manual click alone; agents never publish a draft (#3106).
 - `recipes/README.md` no longer hedges `agents/` and `jobs/` as provisional folder names; they are final (#3262).
