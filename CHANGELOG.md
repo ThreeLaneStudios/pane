@@ -22,6 +22,7 @@ Format: [Semantic Versioning](https://semver.org/). Each entry includes the vers
 - `docs/adr/0034-paneapp-ai-email-verification-posture.md`'s typo'd-email example used a typo'd address (`mtt@paneapp.ai`) that no longer corresponded to the correct address it was being contrasted with (`admin@paneapp.ai`); it now reads `admn@paneapp.ai` instead of `admin@paneapp.ai`, a dropped-character typo of the correct address (#441).
 - `docs/release-runbook.md` states that publishing a release is Matt's manual click alone; agents never publish a draft (#3106).
 - `recipes/README.md` no longer hedges `agents/` and `jobs/` as provisional folder names; they are final (#3262).
+- `README.md`'s Build from source requirements sentence no longer states a fixed Rust floor ("1.77 or later"); it now points at `rust-toolchain.toml`'s pinned `1.99.1` and notes `rustup` installs it automatically. The sentence's Node.js clause no longer says "20 or later"; it now states the `^20.19`, `^22.12`, `>=24` ranges that `vite` and `@sveltejs/vite-plugin-svelte` require via their `engines` fields, enforced by this repo's `engine-strict=true`. The pnpm and Tauri CLI parts of the same sentence are unchanged (#451).
 
 ### Fixed
 - `recipes/RECIPE-TEMPLATE.md`'s `## What it touches` comment cited the wrong checklist item for the touches-matching rule; it now cites the correct item and names both the PR and issue-form submission routes (#3262).
