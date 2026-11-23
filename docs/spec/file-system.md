@@ -32,6 +32,8 @@
 > **Status:** BUILT
 
 - **Pane always resolves its root folder to its real path.** `get_pane_root()` canonicalizes `~/Pane` (or `PANE_TEST_ROOT` in tests) to its real, symlink-free path — the same resolution `PaneFs` already performs — so a Pane folder reached through a symlink (external volume, synced directory, home-dir symlink) never produces two differently-spelled roots for the same install (#3008).
+- **Local-agent creation stays inside the filesystem policy.** Workspace and `logs` directories are created through `PaneFs` under `PaneRoot::System`. All skeleton-file destinations are authorized before content is written, including existing files that will be preserved. Symlinked derived roots, directories, and destination files are rejected; identity writes use unique temporary files rather than a predictable `.IDENTITY.md.tmp`.
+- **External attachment imports require a native grant.** `copy_attachment_from_path` checks the backend-held Tauri filesystem scope populated by native file selection and drop handlers before reading a source. A renderer-supplied path and successful canonicalization are not authorization. Grants follow the existing Tauri scope lifetime (not single-use tokens); source regular-file/symlink checks still apply, and destinations remain authorized separately through `PaneFs`.
 - **Notes are real markdown files.** If Pane disappears, your notes are still browsable in Finder and editable in any text editor.
 - **SQLite holds metadata only.** The actual content lives on disk. SQLite stores: title, project/folder IDs, task fields, tags, timestamps, file path.
 - **Moving a note = file move + DB update.** Both must succeed atomically. If the file move fails, the DB update is rolled back.
