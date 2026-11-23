@@ -6,7 +6,7 @@ You decide who sees your data, not a big tech company.
 
 Pane is an open-source desktop app where you and your AI agents work in the same place. Build agents from scratch (a strategist, a developer, an auditor, a writer, or anything else) or bring the ones you already run on OpenClaw.
 
-You write notes, keep sheets, and organize projects and tasks. Your agents read all of it and, when you let them, write to it too: draft a doc, fill a sheet, create a task and set its due date, run a job at 7 a.m. every weekday, and leave the result in a note. It all lives in one folder on your machine, and nothing leaves it unless you ask.
+You write notes, keep sheets, and organize projects and tasks. Your agents read all of it and, when you let them, write to it too: draft a doc, fill a sheet, create a task and set its due date, run a job at 7 a.m. every weekday, and leave the result in a note. It all lives in one folder on your machine, and you choose which AI provider sees it.
 
 **Download:** signed macOS builds and Linux x86_64 builds (.deb, .rpm, and AppImage) are on the [Releases](https://github.com/ThreeLaneStudios/pane/releases/latest) page and at [paneapp.ai](https://paneapp.ai). macOS 11 or later, Apple silicon and Intel. Free.
 
@@ -100,7 +100,7 @@ The connection is `pane-gateway`, a small Rust service in this repo (`src-gatewa
 
 macOS: download the DMG from [Releases](https://github.com/ThreeLaneStudios/pane/releases/latest), open it, drag Pane to Applications. The build is signed and notarized. On first launch Pane asks for a provider and a key; after that it opens to Home.
 
-Linux: install the .deb, .rpm, or AppImage from the same Releases page. Keys go to the Secret Service keyring. Linux launched alongside macOS but sees less daily use; what is still being finished is tracked in [#2058](https://github.com/ThreeLaneStudios/pane/issues/2058). Windows is not supported yet ([#2059](https://github.com/ThreeLaneStudios/pane/issues/2059)).
+Linux: install the .deb, .rpm, or AppImage from the same Releases page. Keys go to the Secret Service keyring. Linux launched alongside macOS but sees less daily use; what is still being finished is tracked in [#249](https://github.com/ThreeLaneStudios/pane/issues/249). Windows is not supported yet ([#250](https://github.com/ThreeLaneStudios/pane/issues/250)).
 
 ## Build from source
 
@@ -115,7 +115,7 @@ cargo tauri dev
 
 That opens the app in a native window with the dev server attached. Don't run `cargo build` from the repo root; that compiles the Rust backend alone and gives you a stub.
 
-A local `cargo tauri build` produces an unsigned app. Signed, notarized DMGs come from `scripts/build.sh` on a machine with the signing identity; public releases follow `docs/release-runbook.md`. The OpenClaw gateway is its own crate under `src-gateway/` with its own README.
+A local `cargo tauri build` produces an unsigned app. Signed, notarized builds come only from the release workflow (`.github/workflows/release-publish.yml`); public releases follow `docs/release-runbook.md`. The OpenClaw gateway is its own crate under `src-gateway/` with its own README.
 
 Tests: `pnpm test` for the frontend, `cargo test` inside `src-tauri/` for the backend, `pnpm test:e2e` for the Playwright harness. The full set CI runs is in `.github/workflows/`.
 
@@ -135,11 +135,11 @@ The rules that make this work are written down and enforced:
 - **The audited SHA is the merged SHA.** Nobody pushes after a PASS.
 - **Show the search, not the list.** When a change touches "every place that does X," the scope and the PR must include the command that found those places and its output. A hand-written list of call sites is not accepted.
 
-`docs/dev-hygiene-playbook.md` has the full set. The issue and PR history is the record: every scope, every audit, every FAIL, and what fixed it.
+`docs/dev-hygiene-playbook.md` has the full set. Every scope, audit and fix is written on the issue or pull request it belongs to. The repo was opened from a snapshot, so earlier pull requests stay in a private archive. The open issues came across, and everything from here on is public.
 
 ## Where it is
 
-Version 1.0.x. One developer uses it daily; a handful of others have it installed. It is stable for that. It has not been used by a thousand people, and the parts that only break at scale haven't broken yet.
+Version 1.0.x. It is new and has not been used at scale, so the parts that only break with many users haven't broken yet.
 
 What's next is in `ROADMAP.md`, in order, with the reasoning behind each item. The issue tracker is where it gets built.
 

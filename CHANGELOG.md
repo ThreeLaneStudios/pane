@@ -18,6 +18,7 @@ Format: [Semantic Versioning](https://semver.org/). Each entry includes the vers
 
 ### Documentation
 - `README.md`'s opening bold tagline is replaced with "The open-source app for running AI agents you own." and a new line below it reads "You decide who sees your data, not a big tech company." (#447).
+- `README.md`'s Install section points the Linux and Windows notes at #249 and #250 instead of their pre-migration numbers; the build-from-source paragraph now states signed builds come from the release workflow (`.github/workflows/release-publish.yml`) rather than a local script; the "How it's built" section now states where PR history lives since the repo's migration; the "Where it is" section drops the specific user-count sentence; and the opening paragraph's closing sentence now says you choose which AI provider sees your data (#449).
 - `docs/adr/0034-paneapp-ai-email-verification-posture.md`'s typo'd-email example used a typo'd address (`mtt@paneapp.ai`) that no longer corresponded to the correct address it was being contrasted with (`admin@paneapp.ai`); it now reads `admn@paneapp.ai` instead of `admin@paneapp.ai`, a dropped-character typo of the correct address (#441).
 - `docs/release-runbook.md` states that publishing a release is Matt's manual click alone; agents never publish a draft (#3106).
 - `recipes/README.md` no longer hedges `agents/` and `jobs/` as provisional folder names; they are final (#3262).
