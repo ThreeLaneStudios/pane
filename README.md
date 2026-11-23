@@ -104,7 +104,7 @@ Linux: install the .deb, .rpm, or AppImage from the same Releases page. Keys go 
 
 ## Build from source
 
-You need [Rust](https://rustup.rs/) 1.77 or later, [Node.js](https://nodejs.org/) 20 or later, [pnpm](https://pnpm.io/) 10 or later, the Tauri CLI (`cargo install tauri-cli`), and on macOS the Xcode Command Line Tools (`xcode-select --install`).
+You need [Rust](https://rustup.rs/) (`rust-toolchain.toml` pins `1.99.1`; `rustup` installs that version automatically), [Node.js](https://nodejs.org/) 20 or later, [pnpm](https://pnpm.io/) 10 or later, the Tauri CLI (`cargo install tauri-cli`), and on macOS the Xcode Command Line Tools (`xcode-select --install`).
 
 ```bash
 git clone https://github.com/ThreeLaneStudios/pane
