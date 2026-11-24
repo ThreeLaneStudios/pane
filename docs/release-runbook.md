@@ -96,7 +96,7 @@ carve-out. Added by #3056 after #3048's bump PR had its correct
    release alone, check the run's log.
    Agents never click Publish on a draft release — that action belongs to Matt alone.
    `SHA256SUMS.txt` covers every Linux asset. Like Zed releases, filenames omit
-   the version because the release tag is authoritative: `Pane-aarch64.dmg`,
+   the version because the release tag is authoritative: `Pane-universal.dmg` (Intel + Apple Silicon),
    `pane-linux-x86_64.{deb,rpm,AppImage}`, `PaneGateway-aarch64.dmg`, and
    `pane-gateway-linux-x86_64.{deb,rpm,tar.gz}`. Package metadata still uses
    each ecosystem's native architecture label (`amd64` for DEB, `x86_64` for
