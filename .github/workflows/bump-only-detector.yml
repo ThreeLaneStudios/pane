@@ -1,0 +1,80 @@
+name: CI — Bump-Only Detector
+
+# #460: a bump-only PR (version/metadata files + changelog only) skips the
+# Reed audit. This workflow detects that exact condition and posts one
+# comment reading "bump-only, no audit" — Brit's standing rule keys off
+# that comment's presence verbatim. Silence means the normal flow applies.
+#
+# New file, not a step added to reed-gate.yml: #460 explicitly puts
+# reed-gate.yml out of scope, and the two gates have different permission
+# needs (reed-gate.yml only ever reads; this one writes a PR comment), so
+# keeping them in separate files keeps reed-gate.yml's existing
+# contents: read workflow-level block untouched and gives this detector
+# its own isolated failure domain.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  bump-only-detector:
+    runs-on: ubuntu-latest
+    # Job-level permissions: contents: read is the repo default, but
+    # job-level permissions: REPLACES the workflow-level block rather than
+    # merging with it, so posting a comment (pull-requests: write) means
+    # this job must declare both explicitly, not just the one it's adding.
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect bump-only diff and comment
+        run: |
+          set -e
+
+          # Same source reed-gate.yml uses for "changed files in this PR",
+          # so the two gates agree about what "changed" means.
+          CHANGED=$(git diff --name-only origin/main...HEAD)
+
+          # The exact five-file bump set. Set equality, not reed-gate.yml's
+          # `grep -E "^${path}"` prefix match — a prefix test here would
+          # also match e.g. package.json.bak.
+          EXPECTED_FILES=(
+            "CHANGELOG.md"
+            "package.json"
+            "src-tauri/Cargo.lock"
+            "src-tauri/Cargo.toml"
+            "src-tauri/tauri.conf.json"
+          )
+
+          CHANGED_SORTED=$(echo "$CHANGED" | sort)
+          EXPECTED_SORTED=$(printf '%s\n' "${EXPECTED_FILES[@]}" | sort)
+
+          if [ "$CHANGED_SORTED" != "$EXPECTED_SORTED" ]; then
+            echo "Not a bump-only PR — no comment posted. Silence is the correct signal here."
+            echo "Changed files:"
+            echo "$CHANGED_SORTED"
+            exit 0
+          fi
+
+          echo "Bump-only diff detected (exact match on the five-file set):"
+          echo "$CHANGED_SORTED"
+
+          # Idempotency: check for an existing bump-only comment before
+          # posting. A re-push that re-comments turns the signal into
+          # noise, so a second run on the same PR must be a no-op.
+          EXISTING=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" --paginate -q '.[] | select(.body == "bump-only, no audit") | .id' 2>/dev/null || true)
+
+          if [ -n "$EXISTING" ]; then
+            echo "bump-only comment already present (id: $EXISTING) — skipping, already idempotent."
+            exit 0
+          fi
+
+          echo "bump-only, no audit" | gh pr comment ${{ github.event.pull_request.number }} --body-file -
+          echo "Posted bump-only comment."
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -8,6 +8,9 @@ Format: [Semantic Versioning](https://semver.org/). Each entry includes the vers
 
 ## [Unreleased]
 
+### Added
+- `.github/workflows/bump-only-detector.yml` posts a one-time `bump-only, no audit` comment on PRs whose changed files are exactly the five version/metadata/changelog files, so those PRs skip the Reed audit (#460).
+
 ## [1.0.88] - 2026-11-24
 
 ### Fixed
