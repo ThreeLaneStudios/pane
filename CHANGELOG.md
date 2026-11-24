@@ -11,6 +11,9 @@ Format: [Semantic Versioning](https://semver.org/). Each entry includes the vers
 ### Added
 - `.github/workflows/bump-only-detector.yml` posts a one-time `bump-only, no audit` comment on PRs whose changed files are exactly the five version/metadata/changelog files, so those PRs skip the Reed audit (#460).
 
+### Security
+- Added three dated entries to `docs/security/dependency-audit-exceptions.yml` (review_by 2027-01-15) for `url`/RUSTSEC-2026-0592 (cargo-tauri, cargo-gateway) and `cookie`/RUSTSEC-2026-0594 (cargo-tauri), tracked in #461.
+
 ## [1.0.88] - 2026-11-24
 
 ### Fixed
