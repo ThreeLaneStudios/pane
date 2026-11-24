@@ -429,7 +429,7 @@ describe('E — OpenClaw pairing trust boundary and sync grant', () => {
     await fireEvent.click(container.querySelector('.connect-form .btn-primary') as HTMLButtonElement);
     await vi.waitFor(() => expect(container.textContent).toContain('Verify & Connect'));
 
-    const codeInput = container.querySelector('input[maxlength="6"]') as HTMLInputElement;
+    const codeInput = container.querySelector('[data-testid="oc-pairing-code-input"]') as HTMLInputElement;
     await fireEvent.input(codeInput, { target: { value: '123456' } });
     const connectButton = Array.from(container.querySelectorAll('button')).find((button) =>
       button.textContent?.trim() === 'Connect'

@@ -993,13 +993,13 @@
             type="text"
             class="npm-textin npm-textin--mono"
             bind:value={ocCeremonyCode}
-            placeholder="000000"
-            maxlength="6"
+            placeholder="00000000"
+            maxlength="8"
             inputmode="numeric"
             aria-label="Pairing Code"
             onkeydown={(e) => { if (e.key === 'Enter') exchangeOcCeremonyCode(); }}
           />
-          <span class="npm-hint">Enter the 6-digit code from Pane Gateway's terminal on the OC machine. Codes expire after 5 minutes.</span>
+          <span class="npm-hint">Enter the 8-digit code from Pane Gateway's terminal on the OC machine. Codes expire after 5 minutes.</span>
         </div>
         {#if ocCeremonyCodeError}
           <div class="npm-test-err" data-testid="oc-ceremony-code-error">{ocCeremonyCodeError} The fingerprint you accepted is still valid, so only the code is being asked for again.</div>

@@ -912,7 +912,7 @@ emitted to its terminal on startup (on the OC machine). If they
 match, accept. If not, click "Fingerprint doesn't match".
 
 Pairing code
-[ 6-digit field ]   (static copy: "codes expire after 5 minutes")
+[ 8-digit field ]   (static copy: "codes expire after 5 minutes")
 
 Where to find these
 - TLS fingerprint and pairing code are emitted by Pane Gateway to
@@ -931,7 +931,7 @@ Where to find these
 
 **Obtaining the pairing code and TLS fingerprint.** Pane fetches the TLS fingerprint over the wire from the gateway's `/v1/health` endpoint at URL-probe time and displays it on screen. To verify, the user reads the fingerprint that Pane Gateway emitted to its stderr on startup (visible in the terminal where `pane-gateway` is running on the OC machine) and visually compares it against what Pane is displaying. If they match, accept; if not, hard-block.
 
-The pairing code is different: it's not fetched over the wire. Pane Gateway emits the 6-digit pairing code (5-minute expiry) to stderr alongside the fingerprint on startup. The user reads the code from the gateway's terminal and types it into Pane's pairing-code input field.
+The pairing code is different: it's not fetched over the wire. Pane Gateway emits the 8-digit pairing code (5-minute expiry) to stderr alongside the fingerprint on startup. The user reads the code from the gateway's terminal and types it into Pane's pairing-code input field.
 
 **If the code expires before the user finishes entering it** (5-minute window starts at gateway startup), the user runs `pane-gateway pairing-code` on the OC machine to generate a fresh code. The new code has its own 5-minute expiry. The TLS fingerprint does not expire and does not need to be re-fetched — it's stable across the gateway's lifetime because the cert persists at `~/.pane-gateway/gateway.crt` (default; configurable via `GATEWAY_DATA_DIR` env var).
 
@@ -944,7 +944,7 @@ Two operations in one screen; the customer accepts the fingerprint and submits t
 3. On success, gateway returns a 90-day bearer token + `expires_at` + `tenant_id`. Pane stores `gateway_token` (encrypted), `tls_cert_pin`, `gateway_url`, `paired_at`, sets `provider_type = openclaw`, `topology = splitmachine`.
 
 **Pairing-code semantics (capture §3 informs UX):**
-- Code is 6-digit numeric, generated cryptographically (`OsRng` per #722; transitional `thread_rng` pre-#722).
+- Code is 8-digit numeric, generated cryptographically (`OsRng` per #722; transitional `thread_rng` pre-#722).
 - Code TTL is 5 minutes from generation.
 - Code is one-time-use; on success it's invalidated.
 - Wrong code does *not* invalidate the active code — customer can retry on typos within the 5-minute window.
