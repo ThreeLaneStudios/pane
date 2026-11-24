@@ -8,6 +8,9 @@ Format: [Semantic Versioning](https://semver.org/). Each entry includes the vers
 
 ## [Unreleased]
 
+### Fixed
+- The pairing-code fields in `Onboarding.svelte` and `NewProviderModal.svelte` now accept 8-digit codes, matching what Pane Gateway emits (#457).
+
 ## [1.0.87] - 2026-11-23
 
 ### Added
