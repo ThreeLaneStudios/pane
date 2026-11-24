@@ -925,13 +925,13 @@ pub fn check_name_collision(name: String, db: State<DbState>) -> Result<bool, St
 }
 
 /// Internal: create a local agent. Returns the new agent_id on success.
-/// agent_dir, agent_id, and workspace_path are provided for testability (avoids calling get_pane_root()
-/// in tests) and to guarantee the filesystem path and DB workspace_path come from the SAME UUID.
+/// pane_root is provided for testability without changing the runtime root.
+/// agent_id and workspace_path come from the SAME caller-generated UUID.
 /// NEVER call Uuid::new_v4() inside this function — callers own UUID generation (Fix A, audit 2026-07-26).
 fn create_local_agent_impl(
     conn: &Connection,
     request: &CreateLocalAgentRequest,
-    agent_dir: &std::path::Path,
+    pane_root: &std::path::Path,
     agent_id: &str,
     workspace_path: &str,
 ) -> Result<String, String> {
@@ -959,32 +959,49 @@ fn create_local_agent_impl(
     // Do NOT generate any UUID here.
 
     // Step 2: Create filesystem folder + skeleton files (before DB write, per ADR-0039 D7)
-    std::fs::create_dir_all(agent_dir)
+    let workspace_relative = PaneFs::relative_from_names([workspace_path])
+        .map_err(|e| format!("Invalid agent workspace path: {}", e))?;
+    let pane_fs =
+        PaneFs::from_pane_root(pane_root).map_err(|e| format!("Filesystem policy error: {}", e))?;
+    pane_fs
+        .create_dir_all(PaneRoot::System, &workspace_relative)
         .map_err(|e| format!("Failed to create agent directory: {}", e))?;
-
-    // Create logs/ subdirectory — new local agents are always promoted to main (§24.7A, Item 3 fix)
-    std::fs::create_dir_all(agent_dir.join("logs"))
+    pane_fs
+        .create_dir_all(PaneRoot::System, &workspace_relative.join("logs"))
         .map_err(|e| format!("Failed to create logs directory: {}", e))?;
 
-    // Write IDENTITY.md atomically (ADR-0039 D7: filesystem before DB)
-    let identity_content = format!("# {}\n\nYour name is {}.\n", request.name, request.name);
-    let identity_path = agent_dir.join("IDENTITY.md");
-    let tmp_identity = agent_dir.join(".IDENTITY.md.tmp");
-    std::fs::write(&tmp_identity, &identity_content)
-        .map_err(|e| format!("Failed to write IDENTITY.md (temp): {}", e))?;
-    std::fs::rename(&tmp_identity, &identity_path)
-        .map_err(|e| format!("Failed to finalize IDENTITY.md: {}", e))?;
+    // Authorize all destinations before writing, including existing files we preserve.
+    let identity_path = pane_fs
+        .authorize_write(PaneRoot::System, &workspace_relative.join("IDENTITY.md"))
+        .map_err(|e| format!("Unsafe IDENTITY.md destination: {}", e))?;
+    let soul_path = pane_fs
+        .authorize_write(PaneRoot::System, &workspace_relative.join("SOUL.md"))
+        .map_err(|e| format!("Unsafe SOUL.md destination: {}", e))?;
+    let memory_path = pane_fs
+        .authorize_write(PaneRoot::System, &workspace_relative.join("MEMORY.md"))
+        .map_err(|e| format!("Unsafe MEMORY.md destination: {}", e))?;
 
-    // Write empty SOUL.md + MEMORY.md skeletons
-    let soul_path = agent_dir.join("SOUL.md");
-    if !soul_path.exists() {
-        std::fs::write(&soul_path, "")
-            .map_err(|e| format!("Failed to write SOUL.md: {}", e))?;
-    }
-    let memory_path = agent_dir.join("MEMORY.md");
-    if !memory_path.exists() {
-        std::fs::write(&memory_path, "")
-            .map_err(|e| format!("Failed to write MEMORY.md: {}", e))?;
+    let identity_content = format!("# {}\n\nYour name is {}.\n", request.name, request.name);
+    // No sync before the agent row exists; the shared writer uses a unique temporary file.
+    crate::file_ops::atomic_write(
+        identity_path.as_path(),
+        &identity_content,
+        None,
+        crate::file_ops::WriteOrigin::Local,
+    )?;
+    for path in [soul_path, memory_path] {
+        match std::fs::symlink_metadata(path.as_path()) {
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                crate::file_ops::atomic_write(
+                    path.as_path(),
+                    "",
+                    None,
+                    crate::file_ops::WriteOrigin::Local,
+                )?;
+            }
+            Err(error) => return Err(format!("Failed to inspect skeleton file: {}", error)),
+        }
     }
 
     // Step 3: Single transaction — demote current default, INSERT new agent as default
@@ -1061,9 +1078,9 @@ pub fn create_local_agent(request: CreateLocalAgentRequest, db: State<DbState>) 
     let agent_id = agent_uuid.to_string();
     let workspace_path = agent_uuid.simple().to_string().to_uppercase();
     let pane_root = get_pane_root();
-    let agent_dir = pane_root.join(".pane").join("system").join(&workspace_path);
     let conn = db.0.lock().unwrap();
-    let returned_id = create_local_agent_impl(&conn, &request, &agent_dir, &agent_id, &workspace_path)?;
+    let returned_id =
+        create_local_agent_impl(&conn, &request, &pane_root, &agent_id, &workspace_path)?;
     drop(conn);
     get_agent(returned_id, db)
 }
@@ -1307,7 +1324,7 @@ mod tests {
         let agent_uuid = uuid::Uuid::new_v4();
         let agent_id = agent_uuid.to_string();
         let workspace_path = agent_uuid.simple().to_string().to_uppercase();
-        let agent_dir = tmp.path().join(&workspace_path);
+        let agent_dir = tmp.path().join(".pane/system").join(&workspace_path);
 
         let req = CreateLocalAgentRequest {
             name: "New Agent".to_string(),
@@ -1315,15 +1332,15 @@ mod tests {
             description: None,
             runtime_type: "openrouter".to_string(),
         };
-        let id = create_local_agent_impl(&conn, &req, &agent_dir, &agent_id, &workspace_path)
+        let id = create_local_agent_impl(&conn, &req, tmp.path(), &agent_id, &workspace_path)
             .expect("create should succeed");
 
         // New agent must be default
-        let new_default_id: String = conn.query_row(
-            "SELECT id FROM ai_agents WHERE is_default = 1",
-            [],
-            |r| r.get(0),
-        ).unwrap();
+        let new_default_id: String = conn
+            .query_row("SELECT id FROM ai_agents WHERE is_default = 1", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
         assert_eq!(new_default_id, id, "new agent must be promoted to default");
 
         // Old agent must be demoted
@@ -1361,7 +1378,6 @@ mod tests {
         let agent_uuid = uuid::Uuid::new_v4();
         let agent_id = agent_uuid.to_string();
         let workspace_path = agent_uuid.simple().to_string().to_uppercase();
-        let agent_dir = tmp.path().join(&workspace_path);
 
         let req = CreateLocalAgentRequest {
             name: "Anthropic Agent".to_string(),
@@ -1369,7 +1385,7 @@ mod tests {
             description: None,
             runtime_type: "anthropic".to_string(),
         };
-        let id = create_local_agent_impl(&conn, &req, &agent_dir, &agent_id, &workspace_path)
+        let id = create_local_agent_impl(&conn, &req, tmp.path(), &agent_id, &workspace_path)
             .expect("create should succeed");
 
         let runtime_type: Option<String> = conn.query_row(
@@ -1390,7 +1406,7 @@ mod tests {
         let agent_uuid = uuid::Uuid::new_v4();
         let agent_id = agent_uuid.to_string();
         let workspace_path = agent_uuid.simple().to_string().to_uppercase();
-        let agent_dir = tmp.path().join(&workspace_path);
+        let agent_dir = tmp.path().join(".pane/system").join(&workspace_path);
 
         let req = CreateLocalAgentRequest {
             name: "Bad Runtime Agent".to_string(),
@@ -1398,7 +1414,7 @@ mod tests {
             description: None,
             runtime_type: "totally-not-a-runtime".to_string(),
         };
-        let err = create_local_agent_impl(&conn, &req, &agent_dir, &agent_id, &workspace_path)
+        let err = create_local_agent_impl(&conn, &req, tmp.path(), &agent_id, &workspace_path)
             .expect_err("invalid runtime_type should error");
         assert!(err.contains("Invalid runtime_type"), "error should name the bad field: {}", err);
 
@@ -1420,7 +1436,7 @@ mod tests {
         let agent_uuid = uuid::Uuid::new_v4();
         let agent_id = agent_uuid.to_string();
         let workspace_path = agent_uuid.simple().to_string().to_uppercase();
-        let agent_dir = tmp.path().join(&workspace_path);
+        let agent_dir = tmp.path().join(".pane/system").join(&workspace_path);
 
         let req = CreateLocalAgentRequest {
             name: "Path Match Test".to_string(),
@@ -1428,8 +1444,9 @@ mod tests {
             description: None,
             runtime_type: "openrouter".to_string(),
         };
-        let returned_id = create_local_agent_impl(&conn, &req, &agent_dir, &agent_id, &workspace_path)
-            .expect("create should succeed");
+        let returned_id =
+            create_local_agent_impl(&conn, &req, tmp.path(), &agent_id, &workspace_path)
+                .expect("create should succeed");
 
         // The DB-stored workspace_path must equal the folder name where files were actually created.
         let db_workspace_path: String = conn.query_row(
@@ -1460,7 +1477,6 @@ mod tests {
         let conn = make_test_conn();
         seed_agent(&conn, "agent-existing", "Sam Smith", true, true, None);
         let tmp = TempDir::new().unwrap();
-        let agent_dir = tmp.path().join("collision-dir");
 
         let req = CreateLocalAgentRequest {
             name: "Sam Smith".to_string(), // same slug
@@ -1471,7 +1487,7 @@ mod tests {
         let agent_uuid = uuid::Uuid::new_v4();
         let agent_id = agent_uuid.to_string();
         let workspace_path = agent_uuid.simple().to_string().to_uppercase();
-        let err = create_local_agent_impl(&conn, &req, &agent_dir, &agent_id, &workspace_path)
+        let err = create_local_agent_impl(&conn, &req, tmp.path(), &agent_id, &workspace_path)
             .expect_err("should error on collision");
         assert!(err.contains("already exists"), "error should mention collision: {}", err);
 
@@ -1483,6 +1499,7 @@ mod tests {
         ).unwrap();
         assert_eq!(count, 0, "collision must prevent DB write");
 
+        let agent_dir = tmp.path().join(".pane/system").join(&workspace_path);
         // Directory must not have been created (collision detected before FS ops)
         assert!(!agent_dir.exists(), "agent directory must not be created on collision");
     }
@@ -1491,7 +1508,6 @@ mod tests {
     fn test_create_local_agent_empty_name_returns_error() {
         let conn = make_test_conn();
         let tmp = TempDir::new().unwrap();
-        let agent_dir = tmp.path().join("empty-name-dir");
 
         let req = CreateLocalAgentRequest {
             name: "   ".to_string(),
@@ -1502,9 +1518,137 @@ mod tests {
         let agent_uuid = uuid::Uuid::new_v4();
         let agent_id = agent_uuid.to_string();
         let workspace_path = agent_uuid.simple().to_string().to_uppercase();
-        let err = create_local_agent_impl(&conn, &req, &agent_dir, &agent_id, &workspace_path)
+        let err = create_local_agent_impl(&conn, &req, tmp.path(), &agent_id, &workspace_path)
             .expect_err("empty name should error");
-        assert!(err.contains("cannot be empty"), "error should mention empty name: {}", err);
+        assert!(
+            err.contains("cannot be empty"),
+            "error should mention empty name: {}",
+            err
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_create_local_agent_rejects_symlinked_destinations() {
+        use std::os::unix::fs::symlink;
+
+        for relative in [
+            ".pane",
+            ".pane/system",
+            ".pane/system/WORKSPACE",
+            ".pane/system/WORKSPACE/logs",
+            ".pane/system/WORKSPACE/IDENTITY.md",
+            ".pane/system/WORKSPACE/SOUL.md",
+            ".pane/system/WORKSPACE/MEMORY.md",
+        ] {
+            for dangling in [false, true] {
+                let conn = make_test_conn();
+                seed_agent(&conn, "existing-main", "Old Main", true, true, None);
+                let tmp = TempDir::new().unwrap();
+                let pane_root = tmp.path().join("Pane");
+                let outside = tmp.path().join("outside");
+                let is_file = relative.ends_with(".md");
+                if !dangling {
+                    if is_file {
+                        std::fs::write(&outside, "unchanged").unwrap();
+                    } else {
+                        std::fs::create_dir(&outside).unwrap();
+                    }
+                }
+                let link = pane_root.join(relative);
+                std::fs::create_dir_all(link.parent().unwrap()).unwrap();
+                symlink(&outside, &link).unwrap();
+                let req = CreateLocalAgentRequest {
+                    name: "Rejected Agent".to_string(),
+                    model: None,
+                    description: None,
+                    runtime_type: "openrouter".to_string(),
+                };
+                let err =
+                    create_local_agent_impl(&conn, &req, &pane_root, "new-agent", "WORKSPACE")
+                        .expect_err("symlinked destination must be rejected");
+                assert!(err.contains("symlink"), "{}: {}", relative, err);
+                if dangling {
+                    assert!(!outside.exists());
+                } else if is_file {
+                    assert_eq!(std::fs::read_to_string(&outside).unwrap(), "unchanged");
+                } else {
+                    assert_eq!(std::fs::read_dir(&outside).unwrap().count(), 0);
+                }
+                let count: i64 = conn
+                    .query_row("SELECT COUNT(*) FROM ai_agents", [], |r| r.get(0))
+                    .unwrap();
+                assert_eq!(count, 1, "rejection must not insert an agent");
+                let default_id: String = conn
+                    .query_row("SELECT id FROM ai_agents WHERE is_default = 1", [], |r| {
+                        r.get(0)
+                    })
+                    .unwrap();
+                assert_eq!(default_id, "existing-main");
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_create_local_agent_preserves_files_and_ignores_legacy_temp_symlink() {
+        use std::os::unix::fs::symlink;
+
+        let conn = make_test_conn();
+        let tmp = TempDir::new().unwrap();
+        let agent_dir = tmp.path().join(".pane/system/WORKSPACE");
+        std::fs::create_dir_all(&agent_dir).unwrap();
+        let outside = tmp.path().join("outside.md");
+        std::fs::write(&outside, "outside content").unwrap();
+        symlink(&outside, agent_dir.join(".IDENTITY.md.tmp")).unwrap();
+        for name in ["SOUL.md", "MEMORY.md"] {
+            std::fs::write(agent_dir.join(name), "existing content").unwrap();
+        }
+        let req = CreateLocalAgentRequest {
+            name: "Safe Agent".to_string(),
+            model: None,
+            description: None,
+            runtime_type: "openrouter".to_string(),
+        };
+        create_local_agent_impl(&conn, &req, tmp.path(), "new-agent", "WORKSPACE").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&outside).unwrap(),
+            "outside content"
+        );
+        assert_eq!(
+            std::fs::read_to_string(agent_dir.join("IDENTITY.md")).unwrap(),
+            "# Safe Agent\n\nYour name is Safe Agent.\n"
+        );
+        for name in ["SOUL.md", "MEMORY.md"] {
+            assert_eq!(
+                std::fs::read_to_string(agent_dir.join(name)).unwrap(),
+                "existing content"
+            );
+        }
+        assert!(agent_dir.join("logs").is_dir());
+    }
+
+    #[test]
+    fn test_create_local_agent_rejects_unsafe_workspace() {
+        for workspace in ["", ".", "..", "../escape", "/escape", "a/b", "a\\b"] {
+            let conn = make_test_conn();
+            let tmp = TempDir::new().unwrap();
+            let pane_root = tmp.path().join("Pane");
+            let req = CreateLocalAgentRequest {
+                name: "Unsafe Workspace".to_string(),
+                model: None,
+                description: None,
+                runtime_type: "openrouter".to_string(),
+            };
+            let err = create_local_agent_impl(&conn, &req, &pane_root, "new-agent", workspace)
+                .unwrap_err();
+            assert!(err.contains("Invalid agent workspace path"));
+            assert!(!pane_root.exists());
+            let count: i64 = conn
+                .query_row("SELECT COUNT(*) FROM ai_agents", [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(count, 0);
+        }
     }
 
     // --- set_default_agent_impl (renamed from set_main_agent_impl, #2522 ADR-0063 D3) ---
@@ -1666,7 +1810,7 @@ mod tests {
         let agent_uuid = uuid::Uuid::new_v4();
         let agent_id = agent_uuid.to_string();
         let workspace_path = agent_uuid.simple().to_string().to_uppercase();
-        let agent_dir = tmp.path().join(&workspace_path);
+        let agent_dir = tmp.path().join(".pane/system").join(&workspace_path);
 
         let req = CreateLocalAgentRequest {
             name: "Logs Dir Test".to_string(),
@@ -1674,7 +1818,7 @@ mod tests {
             description: None,
             runtime_type: "openrouter".to_string(),
         };
-        create_local_agent_impl(&conn, &req, &agent_dir, &agent_id, &workspace_path)
+        create_local_agent_impl(&conn, &req, tmp.path(), &agent_id, &workspace_path)
             .expect("create should succeed");
 
         assert!(
