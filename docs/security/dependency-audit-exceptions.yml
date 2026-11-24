@@ -426,3 +426,30 @@
     Pulled by jsdom — test-only, never ships, same as ws (1123259) above.
   added: 2026-11-10
   review_by: 2027-02-10
+
+- id: RUSTSEC-2026-0592
+  package: url
+  scope: cargo-tauri
+  reason: >
+    Stack overflow in Url::origin() on nested blob: URLs. Fix tracked in
+    #461.
+  added: 2026-11-24
+  review_by: 2027-01-15
+
+- id: RUSTSEC-2026-0592
+  package: url
+  scope: cargo-gateway
+  reason: >
+    Stack overflow in Url::origin() on nested blob: URLs. Fix tracked in
+    #461.
+  added: 2026-11-24
+  review_by: 2027-01-15
+
+- id: RUSTSEC-2026-0594
+  package: cookie
+  scope: cargo-tauri
+  reason: >
+    Private cookie nonces can repeat in processes that fork. Fix tracked in
+    #461.
+  added: 2026-11-24
+  review_by: 2027-01-15
