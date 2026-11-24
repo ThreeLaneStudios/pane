@@ -431,7 +431,8 @@ jobs:
           TAURI_DMG_DIR="src-tauri/target/universal-apple-darwin/release/bundle/dmg"
           APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/Pane.app"
           SOURCE_DMG=$(find "$TAURI_DMG_DIR" -maxdepth 1 -name '*.dmg' -print -quit)
-          FINAL_DMG="/tmp/Pane_${VERSION}.dmg"
+          # Public asset names are versionless; the release tag identifies the version.
+          FINAL_DMG="/tmp/Pane-universal.dmg"
           WORK_DMG="/tmp/Pane_${VERSION}_work.dmg"
           RW_DMG="/tmp/Pane_${VERSION}_work_rw.dmg"
           STAGING_DMG="/tmp/.Pane_${VERSION}.building.dmg"
@@ -768,7 +769,7 @@ jobs:
           TAURI_DMG_DIR="src-tauri/target/universal-apple-darwin/release/bundle/dmg"
           APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/Pane.app"
           SOURCE_DMG=$(find "$TAURI_DMG_DIR" -maxdepth 1 -name '*.dmg' -print -quit)
-          FINAL_DMG="$RUNNER_TEMP/Pane_${VERSION}.dmg"
+          FINAL_DMG="$RUNNER_TEMP/Pane-universal.dmg"
           WORK_DMG="$RUNNER_TEMP/Pane_${VERSION}_work.dmg"
           RW_DMG="$RUNNER_TEMP/Pane_${VERSION}_work_rw.dmg"
           STAGING_DMG="$RUNNER_TEMP/.Pane_${VERSION}.building.dmg"

@@ -8,6 +8,9 @@ Format: [Semantic Versioning](https://semver.org/). Each entry includes the vers
 
 ## [Unreleased]
 
+### Fixed
+- Restore versionless macOS release installer naming as `Pane-universal.dmg`, matching the website download contract and the Intel/Apple Silicon build. The release and signing-test workflows use the same final filename; internal staging files remain versioned. No app or Gateway version changes are needed for this packaging-name correction.
+
 ### Added
 - `.github/workflows/bump-only-detector.yml` posts a one-time `bump-only, no audit` comment on PRs whose changed files are exactly the five version/metadata/changelog files, so those PRs skip the Reed audit (#460).
 
