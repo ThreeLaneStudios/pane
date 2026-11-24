@@ -1,0 +1,91 @@
+name: Submit a recipe
+description: Submit a recipe for a Pane agent or job, without writing a pull request yourself
+title: "[Recipe]: "
+labels: ["recipe"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing a recipe! Fill out the fields below — a maintainer
+        will turn this into a pull request. Every submission goes through
+        review against [recipes/REVIEW-CHECKLIST.md](https://github.com/ThreeLaneStudios/pane/blob/main/recipes/REVIEW-CHECKLIST.md)
+        before it merges.
+
+  - type: input
+    id: recipe-name
+    attributes:
+      label: Recipe name
+      description: A short, descriptive name for this recipe.
+      placeholder: "Daily inbox triage"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: recipe-type
+    attributes:
+      label: Recipe type
+      description: Does this run as an ongoing agent, or as a one-off job?
+      options:
+        - agent
+        - job
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-it-does
+    attributes:
+      label: What it does
+      description: Plain language — what does this recipe do, and why would someone want it?
+      placeholder: "This recipe..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: the-prompt
+    attributes:
+      label: The prompt
+      description: The exact prompt text. This is what actually runs — paste it in full.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: touches-files
+    attributes:
+      label: What files does it touch?
+      description: One path per line — files or folders it reads or writes. Write "none" if there aren't any.
+      placeholder: "none"
+    validations:
+      required: true
+
+  - type: textarea
+    id: touches-network
+    attributes:
+      label: What network access does it use?
+      description: One domain or service per line. Write "none" if there aren't any.
+      placeholder: "none"
+    validations:
+      required: true
+
+  - type: textarea
+    id: touches-commands
+    attributes:
+      label: What commands does it run?
+      description: One command or binary per line. Write "none" if there aren't any.
+      placeholder: "none"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-it-touches
+    attributes:
+      label: What does this touch, in your own words?
+      description: >-
+        Describe what this recipe reads, writes, downloads, or runs, in
+        plain language. Write this yourself — don't just restate the three
+        lists below. A maintainer pastes this verbatim into the recipe's
+        "What it touches" section; it is not rewritten from your answers
+        to the questions below.
+      placeholder: "This recipe reads my inbox over IMAP and writes a short summary to one file on my machine. It doesn't run any other programs."
+    validations:
+      required: true

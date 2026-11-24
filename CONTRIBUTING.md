@@ -10,11 +10,13 @@ GitHub is the source of truth. Decisions live on issues, not in chat. If a chang
 
 We build one thing at a time. A feature goes through scope, build, audit, and merge in that order, and a new build does not start until the previous one lands. This keeps the main branch always releasable and keeps review honest. If your pull request sits for a bit while something else finishes, that is the queue, not a verdict.
 
+The rules below are the summary. [docs/dev-hygiene-playbook.md](docs/dev-hygiene-playbook.md) is the full version, with the reasoning behind each gate.
+
 ## Before you start
 
 Look for an existing issue first. If there is one, comment that you are taking it so nobody else does. If there is not, open one before writing code, and keep it to one thing: what is wrong or missing, how to reproduce it or where it would live, and a `Spec Section:` line. Bugs with reproduction steps and a version number get fixed fastest.
 
-**Every issue names its spec section.** Pane's behavior is defined in `docs/spec/`, and an issue has to say which part it touches: `Spec Section: §X.Y` for existing behavior, or `Spec Section: NEW` for a feature the spec does not cover yet. A check runs on every new issue and labels it `needs-spec-section` until that line is there; the pull request gate downstream reads the same spec reference, so an issue without one cannot clear CI.
+**Every issue names its spec section.** Pane's behavior is defined in `docs/spec/`, and an issue has to say which part it touches: `Spec Section: §X.Y` for existing behavior, or `Spec Section: NEW` for a feature the spec does not cover yet. There is no automated check on the issue itself — a maintainer confirms this is present before work starts. The pull request's own spec-first gate is separate and still enforced in CI: it reads the PR's diff and description, not the originating issue, so a PR touching behavior without a spec update (or a `spec-skip:`/`spec-covered-by:` line) cannot clear CI.
 
 **New features get specified before they get built.** If your issue says `NEW`, the first deliverable is the spec section, not the code: a short addition to the right file in `docs/spec/` describing what the feature does, what it stores, and how it fails, agreed on the issue with a maintainer. Once that section exists, the issue updates to point at it and the build can start. This is how Pane stays one coherent app rather than a pile of features; the spec is the contract the tests and the agents work from.
 
@@ -56,7 +58,7 @@ Branch from `main`. Keep the change to what the issue asked for; if you find som
 
 ## Pull requests
 
-Open the pull request against `main`. The body must reference the issue it closes or relates to (`Closes #123`, `Relates to #123`); a check fails without one. Say what changed, how you verified it, and anything the reviewer should look at first.
+Open the pull request against `main`. The body must reference the issue it closes or relates to (`Closes #123`, `Relates to #123`); a check fails without one. Pull requests that touch only files under `recipes/` are exempt from this requirement — a recipe submission does not need an issue reference. Any pull request that touches anything outside `recipes/`, including from first-time outside contributors, still needs one. Say what changed, how you verified it, and anything the reviewer should look at first.
 
 CI runs on every pull request. The checks that matter most:
 

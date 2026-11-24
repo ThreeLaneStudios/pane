@@ -5,6 +5,9 @@ on:
     branches: [main]
     # No paths-ignore — workflow must always trigger so required-status checks report
 
+permissions:
+  contents: read
+
 jobs:
   smoke-fresh-db:
     runs-on: macos-latest
@@ -30,7 +33,7 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED"
           # Check if ALL changed files match docs patterns
-          NON_DOCS=$(echo "$CHANGED" | grep -v -E '^docs/|\.md$|^\.github/ISSUE_TEMPLATE/' || true)
+          NON_DOCS=$(echo "$CHANGED" | grep -v -E '^docs/|\.md$|^\.github/ISSUE_TEMPLATE/|^recipes/' || true)
           if [ -z "$NON_DOCS" ]; then
             echo "docs_only=true" >> "$GITHUB_OUTPUT"
             echo "✅ Only docs changed — skipping smoke test"
@@ -75,7 +78,7 @@ jobs:
           CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
           echo "Changed files:"
           echo "$CHANGED"
-          NON_DOCS=$(echo "$CHANGED" | grep -v -E '^docs/|\.md$|^\.github/ISSUE_TEMPLATE/' || true)
+          NON_DOCS=$(echo "$CHANGED" | grep -v -E '^docs/|\.md$|^\.github/ISSUE_TEMPLATE/|^recipes/' || true)
           if [ -z "$NON_DOCS" ]; then
             echo "docs_only=true" >> "$GITHUB_OUTPUT"
             echo "✅ Only docs changed — skipping smoke test"

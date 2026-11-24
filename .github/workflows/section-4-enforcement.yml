@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   # §36.11 / #3059: "The scheduler is the only component that starts a turn
   # nobody typed." Deliberately NOT gated by changed-files like the two jobs

@@ -9,6 +9,9 @@ name: E2E — Playwright (self-hosted)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   e2e-tier1:
     runs-on: [self-hosted, macOS, ARM64]

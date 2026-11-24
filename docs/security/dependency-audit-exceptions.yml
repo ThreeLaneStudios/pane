@@ -259,6 +259,33 @@
   added: 2026-11-10
   review_by: 2027-02-10
 
+- id: "1247710"
+  package: picomatch
+  scope: pnpm
+  reason: >
+    GHSA-fc5q-39xc-vjpf / CVE-2026-112366, ReDoS via single-branch repeated
+    extglob patterns (e.g. `+(*)`), distinct from and not covered by the
+    existing 1115554 entry above (different GHSA id, different trigger
+    shape — extglob quantifier count vs. single-branch repetition).
+    No patched version exists: npm registry's latest picomatch is still
+    4.0.7 (the version already resolved here), OSV's GHSA-fc5q-39xc-vjpf
+    range has no "fixed" event, and the advisory's own referenced fix
+    (micromatch/picomatch#194) is an open, unmerged PR for a related but
+    separate parsing bug. picomatch here is transitive only
+    (svelte-check/vite/vitest -> fdir/tinyglobby -> picomatch, confirmed
+    via `pnpm why picomatch`; no `picomatch` entry in this package.json's
+    dependencies), reached exclusively through fdir's glob-matching during
+    `svelte-check`, `vite build`, and `vitest` — dev/build/test tooling.
+    adapter-static (confirmed in svelte.config.js) means this app ships no
+    Node server; grep of src/ and src-tauri/src/ for a direct `picomatch`
+    import returns nothing. The attack requires feeding a crafted
+    `+(*)`-shaped glob string to picomatch at runtime; nothing Pane ships
+    accepts an untrusted glob pattern — build-time/dev-server tooling only,
+    same reachability class as the existing 1115554 entry, independently
+    re-verified for this distinct advisory rather than inherited from it.
+  added: 2026-11-17
+  review_by: 2027-01-15
+
 - id: "1116232"
   package: vite
   scope: pnpm

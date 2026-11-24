@@ -1683,12 +1683,13 @@
           <input
             type="text"
             bind:value={ocPairingCode}
-            placeholder="000000"
-            maxlength="6"
+            placeholder="00000000"
+            maxlength="8"
             inputmode="numeric"
+            data-testid="oc-pairing-code-input"
             onkeydown={(e) => { if (e.key === 'Enter') exchangePairingCode(); }}
           />
-          <p style="font-size: 12px; color: #71717A; margin-top: 6px;">Enter the 6-digit code from Pane Gateway's terminal on the OC machine. Codes expire after 5 minutes. If expired, run: <code>pane-gateway pairing-code</code></p>
+          <p style="font-size: 12px; color: #71717A; margin-top: 6px;">Enter the 8-digit code from Pane Gateway's terminal on the OC machine. Codes expire after 5 minutes. If expired, run: <code>pane-gateway pairing-code</code></p>
         </div>
         {#if ocPairingError}
           <div class="connect-error-msg">{ocPairingError}</div>

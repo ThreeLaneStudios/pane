@@ -63,20 +63,14 @@ else
 fi
 echo ""
 
-# 5. Check for issues missing spec section
-echo "🔖 Checking for issues missing spec section..."
-if command -v gh &> /dev/null; then
-  MISSING_SPEC=$(gh issue list --repo ThreeLaneStudios/pane --state open --label "needs-spec-section" --json number,title 2>/dev/null | jq -r '.[] | "\(.number): \(.title)"')
-  
-  if [ -n "$MISSING_SPEC" ]; then
-    FAILURES="$FAILURES\n⚠️  Open issues missing spec section:\n$MISSING_SPEC\n"
-  else
-    echo "✅ No issues missing spec section"
-  fi
-else
-  WARNINGS="$WARNINGS\n⚠️  gh CLI not available — skipping needs-spec-section check\n"
-fi
-echo ""
+# 5. (removed, #445) This check used to list open issues labeled
+# needs-spec-section. docs-issue-check.yml and issue-triage-ai.mjs (#445)
+# stopped applying that label, so a label query here would only ever
+# surface stale manual labeling, not a live signal, and a body-text
+# heuristic would duplicate check #4 above without being any more honest.
+# Dropped rather than replaced: an always-empty or always-everything
+# result would be worse than no check at all. Matt deletes the
+# needs-spec-section label itself in a follow-up once #445 merges.
 
 # Output summary
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

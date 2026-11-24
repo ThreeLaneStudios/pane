@@ -8,6 +8,9 @@ on:
       - 'src-gateway/src/routes/**'
       - 'src-gateway/src/server.rs'
 
+permissions:
+  contents: read
+
 jobs:
   skill-sync-check:
     runs-on: ubuntu-latest

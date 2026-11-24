@@ -1,6 +1,6 @@
 [package]
 name = "pane"
-version = "1.0.86"
+version = "1.0.88"
 description = "Your notes. Your machine. Your rules."
 authors = ["Three Lane Studios"]
 license = "Apache-2.0"

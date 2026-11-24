@@ -14,6 +14,7 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use tauri::State;
+use tauri_plugin_fs::FsExt;
 use tauri_plugin_shell::ShellExt;
 
 /// Maximum attachment size accepted via the base64/IPC upload path.
@@ -562,6 +563,22 @@ fn validate_copy_source_path(source_path: &str) -> Result<PathBuf, String> {
     Ok(canonical)
 }
 
+fn authorize_copy_source_path(
+    source_path: &str,
+    scope: &tauri::fs::Scope,
+) -> Result<PathBuf, String> {
+    // The native dialog/drop handlers grant this backend-held scope. A renderer
+    // path string alone is not permission to read an arbitrary local file.
+    if !scope.is_allowed(source_path) {
+        return Err("Attachment source not authorized; select the file using the native picker or drop it into Pane".to_string());
+    }
+    let canonical = validate_copy_source_path(source_path)?;
+    if !scope.is_allowed(&canonical) {
+        return Err("Resolved attachment source is not authorized".to_string());
+    }
+    Ok(canonical)
+}
+
 /// Copy an attachment file from an absolute source path directly into the Assets directory,
 /// bypassing the base64/IPC pipeline entirely.
 ///
@@ -572,6 +589,7 @@ fn validate_copy_source_path(source_path: &str) -> Result<PathBuf, String> {
 /// Paths with `..` components or non-existent files are rejected with a descriptive error.
 #[tauri::command]
 pub async fn copy_attachment_from_path(
+    app: tauri::AppHandle,
     db: State<'_, DbState>,
     project_id: String,
     source_path: String,
@@ -583,8 +601,11 @@ pub async fn copy_attachment_from_path(
         project_id, source_path, filename
     );
 
-    // Validate source path (path-traversal guard)
-    let canonical_source = validate_copy_source_path(&source_path)?;
+    // Fail closed if the filesystem plugin or its native-selection grants are unavailable.
+    let scope = app
+        .try_fs_scope()
+        .ok_or("Attachment source authorization unavailable")?;
+    let canonical_source = authorize_copy_source_path(&source_path, &scope)?;
 
     // 1 GB cap — mirrors MAX_ATTACHMENT_SIZE_BYTES in save_attachment.
     // Stat the file before copy so we reject without allocating any buffer.
@@ -1683,6 +1704,49 @@ mod tests {
             result.unwrap_err().contains("Attachment not found"),
             "Error should mention 'Attachment not found'"
         );
+    }
+
+    #[test]
+    fn test_authorize_copy_source_requires_native_scope_grant() {
+        let app = tauri::test::mock_app();
+        let scope = tauri::fs::Scope::new(&app, &Default::default()).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let selected = dir.path().join("selected.txt");
+        let unselected = dir.path().join("unselected.txt");
+        std::fs::write(&selected, "selected content").unwrap();
+        std::fs::write(&unselected, "private content").unwrap();
+
+        assert!(
+            authorize_copy_source_path(selected.to_str().unwrap(), &scope)
+                .unwrap_err()
+                .contains("not authorized")
+        );
+        // Same backend operation used by the native dialog and file-drop handlers.
+        scope.allow_file(&selected).unwrap();
+        assert_eq!(
+            authorize_copy_source_path(selected.to_str().unwrap(), &scope).unwrap(),
+            selected.canonicalize().unwrap()
+        );
+        assert!(authorize_copy_source_path(unselected.to_str().unwrap(), &scope).is_err());
+        scope.forbid_file(&selected).unwrap();
+        assert!(authorize_copy_source_path(selected.to_str().unwrap(), &scope).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_authorize_copy_source_grant_does_not_bypass_symlink_validation() {
+        use std::os::unix::fs::symlink;
+        let app = tauri::test::mock_app();
+        let scope = tauri::fs::Scope::new(&app, &Default::default()).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target.txt");
+        let link = dir.path().join("link.txt");
+        std::fs::write(&target, "private content").unwrap();
+        symlink(&target, &link).unwrap();
+        scope.allow_file(&link).unwrap();
+        assert!(authorize_copy_source_path(link.to_str().unwrap(), &scope)
+            .unwrap_err()
+            .contains("symlink"));
     }
 
     // --- Path-traversal guard tests (#1799) ---

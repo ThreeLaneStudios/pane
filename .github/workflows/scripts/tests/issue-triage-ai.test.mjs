@@ -43,8 +43,8 @@ test("filterLabels tolerates a non-array input", () => {
   assert.deepEqual(filterLabels(null), { valid: [], dropped: [] });
 });
 
-test("VALID_LABELS is exactly the seven from the issue/scope, in order", () => {
-  assert.deepEqual(VALID_LABELS, ["bug", "feature", "question", "needs-spec-section", "needs-repro", "spam", "duplicate"]);
+test("VALID_LABELS is exactly the six remaining after #445 removed needs-spec-section, in order", () => {
+  assert.deepEqual(VALID_LABELS, ["bug", "feature", "question", "needs-repro", "spam", "duplicate"]);
 });
 
 test("parseClassifyResponse rejects malformed JSON", () => {
@@ -103,29 +103,24 @@ test("parseSpecCheckResponse accepts a consistent addressed=false", () => {
 
 // ─── Amendment 1: fixed-template selection ─────────────────────────────────
 
-test("selectFixedTemplate picks needs-repro when both needs-repro and needs-spec-section apply", () => {
-  const t = selectFixedTemplate(["needs-repro", "needs-spec-section"]);
+test("selectFixedTemplate picks needs-repro when it applies alongside an unrelated label", () => {
+  const t = selectFixedTemplate(["bug", "needs-repro"]);
   assert.equal(t.kind, "needs-repro");
 });
 
-test("selectFixedTemplate picks needs-spec-section alone", () => {
-  const t = selectFixedTemplate(["needs-spec-section"]);
-  assert.equal(t.kind, "needs-spec-section");
-});
-
-test("selectFixedTemplate returns null when neither label applies (e.g. bug+spam only)", () => {
+test("selectFixedTemplate returns null when needs-repro does not apply (e.g. bug+spam only, or #445's removed needs-spec-section)", () => {
   assert.equal(selectFixedTemplate(["bug", "spam"]), null);
   assert.equal(selectFixedTemplate([]), null);
+  // needs-spec-section is no longer a VALID_LABELS member (#445); filterLabels
+  // would already have dropped it before this function ever saw it, but confirm
+  // selectFixedTemplate itself no longer recognizes it either.
+  assert.equal(selectFixedTemplate(["needs-spec-section"]), null);
 });
 
-test("fixed template bodies contain no em dash (amendment 2)", () => {
+test("fixed template body contains no em dash (amendment 2)", () => {
   const repro = selectFixedTemplate(["needs-repro"]);
-  const section = selectFixedTemplate(["needs-spec-section"]);
   assert.equal(repro.body.includes("\u2014"), false);
-  assert.equal(section.body.includes("\u2014"), false);
   assert.match(repro.body, /version.*platform.*steps.*expected/is);
-  assert.match(section.body, /Spec Section:/);
-  assert.match(section.body, /CONTRIBUTING\.md/);
 });
 
 // ─── composeReply: footer always appended exactly once, no em dash ────────
@@ -424,13 +419,13 @@ test("processIssue: Call 2 addressed=true posts the model's reply with the foote
   assert.ok(gh.createCommentCalls[0].body.endsWith(FOOTER));
 });
 
-test("processIssue: Call 2 addressed=false with needs-spec-section falls back to the fixed template (amendment 1, the broader gap)", async () => {
+test("processIssue: Call 2 addressed=false with needs-repro falls back to the fixed template (amendment 1, the broader gap)", async () => {
   const sections = buildSections([
     { file: "x.md", level: 2, text: "## X", startLine: 1, lines: ["# T", "## X", "body"] },
   ]);
   const gh = fakeGh({ permission: "none" });
   const anthropic = fakeAnthropic([
-    JSON.stringify({ labels: ["needs-spec-section"], spec_section: "## X" }),
+    JSON.stringify({ labels: ["needs-repro"], spec_section: "## X" }),
     JSON.stringify({ addressed: false, verdict: "not_addressed", reply: null }),
   ]);
   const gate = makeWriteGate(false);
@@ -445,8 +440,8 @@ test("processIssue: Call 2 addressed=false with needs-spec-section falls back to
     labelCache: new Map(),
     log: () => {},
   });
-  assert.equal(result.replyKind, "fixed-template:needs-spec-section");
-  assert.ok(result.reply.includes("CONTRIBUTING.md"));
+  assert.equal(result.replyKind, "fixed-template:needs-repro");
+  assert.ok(result.reply.includes("version"));
 });
 
 test("processIssue: Call 2 malformed JSON aborts the whole issue, including Call 1's labels", async () => {
@@ -494,7 +489,7 @@ test("processIssue: an invalid spec_section (not an exact heading match) is trea
   assert.equal(result.specSection, null);
   assert.equal(result.specSectionDropped, "## Does Not Exist");
   assert.equal(anthropic.calls.length, 1); // Call 2 never ran
-  assert.equal(result.reply, null); // no needs-repro/needs-spec-section label, so no fixed template either
+  assert.equal(result.reply, null); // no needs-repro label, so no fixed template either
 });
 
 // ─── shouldSkipTeamCheckForTargetedIssues: the dry-run issue_numbers test hook (#3229) ───

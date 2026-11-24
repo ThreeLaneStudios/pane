@@ -94,6 +94,7 @@ carve-out. Added by #3056 after #3048's bump PR had its correct
    release, which sets `--latest`). A failed upload or a wrong asset count
    also leaves a draft; the two states are not distinguishable from the
    release alone, check the run's log.
+   Agents never click Publish on a draft release — that action belongs to Matt alone.
    `SHA256SUMS.txt` covers every Linux asset. Like Zed releases, filenames omit
    the version because the release tag is authoritative: `Pane-aarch64.dmg`,
    `pane-linux-x86_64.{deb,rpm,AppImage}`, `PaneGateway-aarch64.dmg`, and
