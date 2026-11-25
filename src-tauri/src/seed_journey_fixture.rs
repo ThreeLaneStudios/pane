@@ -39,11 +39,16 @@
 //! §3). `http://127.0.0.1:1` is the exact value `ai/scheduler.rs`'s own
 //! existing tests already use for the same reason.
 //!
-//! No mock Ollama endpoint in this PR — confirmed in the same follow-up
-//! comment: neither smoke test sends a chat message, and
-//! `ai_configure_and_save`'s connectivity validation is openclaw-only. The
-//! mock lands in PR 4, where a journey first actually needs a reachable
-//! provider.
+//! #470 PR 4: `ollama_endpoint` now reads `MOCK_OLLAMA_ENDPOINT` first,
+//! falling back to the same inert address when it's unset. Additive and
+//! backward-compatible — `e2e-linux.yml`'s own smoke-test-only invocation
+//! of this test never sets `MOCK_OLLAMA_ENDPOINT`, so it still seeds the
+//! inert fast-refusing address exactly as before. The journeys step sets
+//! it to a real, locally-bound mock Ollama server (`e2e/journeys/mock-
+//! ollama.mjs`) before running this same seed step, so the voluntary
+//! create-agent flow's model picker (`fetch_available_models` ->
+//! `fetch_ollama_models` -> `GET {endpoint}/api/tags`) gets a real,
+//! fixed-response model list instead of an instant `ECONNREFUSED`.
 //!
 //! Run with (from `src-tauri/`):
 //!   cargo test --lib seed_journey_fixture -- --ignored --nocapture
@@ -142,13 +147,23 @@ mod tests {
         // Step 3: ollama_endpoint -- a plain ai_settings write, the same
         // lighter-weight mechanism dozens of existing unit tests already
         // use (e.g. ai/runtime_resolution.rs, ai/scheduler.rs). The
-        // onboarding gate never reads this key; it's seeded purely so the
-        // one detached background provider-registry call (lib.rs) fails
-        // fast instead of riding out a timeout on every CI launch.
+        // onboarding gate never reads this key; it's seeded so the one
+        // detached background provider-registry call (lib.rs) and the
+        // voluntary create-agent flow's model picker both have a real
+        // address to dial.
+        //
+        // #470 PR 4: additive env override. When the journeys workflow step
+        // starts the mock Ollama server first and sets MOCK_OLLAMA_ENDPOINT
+        // (e2e/journeys/mock-ollama.mjs's bound port), the seeded setting
+        // points at it. When unset (the smoke-test-only path PR 3 already
+        // exercised), falls back to the same inert, fast-refusing address
+        // as before -- behavior for that path is unchanged.
+        let ollama_endpoint = std::env::var("MOCK_OLLAMA_ENDPOINT")
+            .unwrap_or_else(|_| INERT_OLLAMA_ENDPOINT.to_string());
         {
             let db_state = app.state::<DbState>();
             let conn_guard = db_state.0.lock().expect("db mutex poisoned");
-            database::set_ai_setting(&conn_guard, "ollama_endpoint", INERT_OLLAMA_ENDPOINT)
+            database::set_ai_setting(&conn_guard, "ollama_endpoint", &ollama_endpoint)
                 .expect("seed_journey_fixture: set_ai_setting(ollama_endpoint) failed");
 
             // Flush WAL to the main DB file -- the next reader is a

@@ -5,6 +5,11 @@ dist/
 target/
 .DS_Store
 
+# #470 PR 4: journey run output (step PNGs + manifest.json) -- generated
+# by e2e/journeys/*.journey.ts, uploaded as a CI artifact, never committed.
+e2e/journeys-output/
+e2e/test-results/
+
 # Pane runtime workspace artifacts (sync state created when running Pane locally
 # against the gateway). NOT source. Has been accidentally committed twice in two
 # days — PR #1315 and PR #1330. See #1317 (CI dirty-tree guard) for mechanical

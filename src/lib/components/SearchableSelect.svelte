@@ -75,6 +75,14 @@
     containerClass?: string;
     inputClass?: string;
     testId?: string;
+    // #470 PR 4: optional per-row test id, additive. This component (not
+    // SearchableModelSelect.svelte) owns the `{#each}` loop and the row's
+    // `<button class="dropdown-item">` wrapper itself -- see this file's
+    // own header comment -- so a stable, non-text, per-row selector for
+    // journeys/E2E has to be applied here. `undefined` (every existing
+    // caller: ScheduledPanel.svelte's two direct <SearchableSelect> call
+    // sites) renders exactly as before -- no attribute at all.
+    testIdForItem?: (item: SearchableSelectItem) => string;
     // #3171 PR 2: ScheduledPanel's Agent field locks while editing a job
     // (§36.3.3 — the session is permanently bound to its agent). Forwarded
     // straight to the underlying <input disabled>, same gate the native
@@ -135,6 +143,7 @@
     containerClass = '',
     inputClass = '',
     testId,
+    testIdForItem,
     disabled = false,
     inline = false,
   }: Props = $props();
@@ -311,6 +320,7 @@
         type="button"
         class="dropdown-item"
         class:selected={item.id === selectedId}
+        data-testid={testIdForItem ? testIdForItem(item) : undefined}
         onmousedown={(e) => {
           e.preventDefault();
           selectItem(item.id);
