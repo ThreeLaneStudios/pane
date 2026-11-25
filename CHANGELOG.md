@@ -8,6 +8,9 @@ Format: [Semantic Versioning](https://semver.org/). Each entry includes the vers
 
 ## [Unreleased]
 
+### Documentation
+- `docs/spec/testing.md` §25.2's Layer 5 entry is renamed "End-to-End Tests and Journeys" and its body updated to reflect that Playwright specs already drive the real app; a new §25.13 Journeys section specs out journey scripts (test + generated docs page per how-to), where/when they run, and the rules for writing one (#470).
+
 ### Fixed
 - Restore versionless macOS release installer naming as `Pane-universal.dmg`, matching the website download contract and the Intel/Apple Silicon build. The release and signing-test workflows use the same final filename; internal staging files remain versioned. No app or Gateway version changes are needed for this packaging-name correction.
 
