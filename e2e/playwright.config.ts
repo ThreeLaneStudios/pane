@@ -6,6 +6,15 @@ export default defineConfig({
   testDir: './tests',
   
   projects: [
+    // #470 PR 2: lets the existing e2e/tests/smoke.spec.ts (not under any
+    // tier*/ testDir, so untouched by the tier1/2/3 projects below) run via
+    // `--project=smoke` from .github/workflows/e2e-linux.yml. No new test
+    // content -- this only makes the pre-existing file discoverable.
+    {
+      name: 'smoke',
+      testMatch: /smoke\.spec\.ts$/,
+      timeout: 30000,
+    },
     {
       name: 'tier1',
       testDir: './tests/tier1',
