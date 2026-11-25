@@ -10,6 +10,7 @@ Format: [Semantic Versioning](https://semver.org/). Each entry includes the vers
 
 ### Added
 - internal: `.github/workflows/e2e-linux.yml` — a GitHub-hosted Linux/Xvfb workflow that builds Pane, launches it in test mode, and runs the existing `e2e/tests/smoke.spec.ts` to prove the tauri-plugin-playwright socket bridge end to end before any journey content is written (#470).
+- internal: bump `tauri-plugin-playwright` (Rust 0.2→0.4, npm `@srsholmes/tauri-playwright` 0.2.2→0.4.1) — 0.4 adds real webkit2gtk-backed screenshot capture on Linux, replacing 0.2's "native screenshot not yet supported on this platform" stub; the wire protocol and TS types are unchanged, and no new top-level Cargo dependencies are introduced (`gdk-pixbuf`, `gtk`, `glib`, `soup3`, `webkit2gtk` were already resolved via `tauri`/`wry`) (#470).
 
 ### Documentation
 - `docs/spec/testing.md` §25.2's Layer 5 entry is renamed "End-to-End Tests and Journeys" and its body updated to reflect that Playwright specs already drive the real app; a new §25.13 Journeys section specs out journey scripts (test + generated docs page per how-to), where/when they run, and the rules for writing one (#470).
