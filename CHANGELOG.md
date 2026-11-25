@@ -8,6 +8,9 @@ Format: [Semantic Versioning](https://semver.org/). Each entry includes the vers
 
 ## [Unreleased]
 
+### Added
+- internal: `.github/workflows/e2e-linux.yml` — a GitHub-hosted Linux/Xvfb workflow that builds Pane, launches it in test mode, and runs the existing `e2e/tests/smoke.spec.ts` to prove the tauri-plugin-playwright socket bridge end to end before any journey content is written (#470).
+
 ### Documentation
 - `docs/spec/testing.md` §25.2's Layer 5 entry is renamed "End-to-End Tests and Journeys" and its body updated to reflect that Playwright specs already drive the real app; a new §25.13 Journeys section specs out journey scripts (test + generated docs page per how-to), where/when they run, and the rules for writing one (#470).
 

@@ -1,0 +1,159 @@
+name: E2E — Linux Smoke (plumbing proof)
+
+# #470 PR 2 (revised order): before any journey content is written, prove
+# the three links journeys will depend on -- app build, the
+# tauri-plugin-playwright socket bridge, and screenshot() -- actually
+# complete end to end, on a real GitHub-hosted Linux runner.
+#
+# Why this has to exist: e2e-tier1 (.github/workflows/e2e.yml) has never
+# produced a single run (self-hosted macOS, workflow_dispatch-only -- see
+# that file's own header for why: fork-PR RCE on Matt's Studio hardware).
+# The Studio runner also has no window-server session at all, which is the
+# actual reason this job has to be GitHub-hosted Linux under a virtual
+# display rather than anything that could run on the Studio box.
+# tauri-plugin-playwright's screenshot() API was, until this workflow,
+# verified only at the TypeScript declaration level
+# (node_modules/@srsholmes/tauri-playwright/dist/index.d.ts) -- the paired
+# Rust-side plugin command had never actually executed, on CI or anywhere
+# else. This workflow is that first real execution.
+#
+# Deliberately a NEW file, not an edit to e2e.yml -- e2e.yml stays
+# self-hosted/macOS/workflow_dispatch-only per its own RCE note.
+#
+# docs/spec/testing.md §25.13 says journeys do not run on ordinary pull
+# requests. The pull_request trigger below is scoped to this workflow
+# file's own path only, so this PR can prove itself green (or honestly
+# red) before merge, without adding CI time to any other PR -- it is not a
+# general PR trigger and does not violate §25.13's rule.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/e2e-linux.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tauri 2.x Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libxdo-dev \
+            build-essential \
+            pkg-config \
+            curl \
+            file \
+            xvfb
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.29.2
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Build frontend (populates build/, embedded via frontendDist)
+        run: pnpm build
+
+      # custom-protocol is the feature `tauri build`/`tauri dev --release`
+      # uses to embed `build/` instead of loading `devUrl` at runtime --
+      # needed here because nothing in this job runs a Vite dev server.
+      # debug_assertions (not custom-protocol) is what gates the
+      # tauri-plugin-playwright registration in lib.rs, so this is still a
+      # debug build with the test plugin compiled in.
+      - name: Build Pane (debug, embedded frontend)
+        working-directory: src-tauri
+        run: cargo build --bin pane --features tauri/custom-protocol
+
+      - name: Start Pane under Xvfb, wait for the test socket
+        env:
+          PANE_TEST_MODE: "1"
+          PANE_TEST_ROOT: ${{ runner.temp }}/pane-test-root
+          PANE_TEST_DB: ${{ runner.temp }}/pane-test-root/test.db
+        run: |
+          mkdir -p "$PANE_TEST_ROOT"
+          rm -f /tmp/tauri-playwright.sock
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" \
+            ./src-tauri/target/debug/pane > /tmp/pane-test.log 2>&1 &
+          echo $! > /tmp/pane.pid
+          echo "Pane starting (PID $(cat /tmp/pane.pid)), waiting for test socket..."
+          for i in $(seq 1 90); do
+            if [ -e /tmp/tauri-playwright.sock ]; then
+              echo "✅ test socket ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          if [ ! -e /tmp/tauri-playwright.sock ]; then
+            echo "❌ test socket not found after 90s"
+            echo "Last 150 lines of Pane log:"
+            tail -150 /tmp/pane-test.log
+            exit 1
+          fi
+
+      # Runs the EXISTING e2e/tests/smoke.spec.ts (no new test content).
+      # Scoped via --grep to the one test that calls tauriPage.screenshot()
+      # -- the other test in this file ("Pane sidebar is visible") waits
+      # for `.sidebar`, which a brand-new PANE_TEST_DB never renders: zero
+      # seeded agents means `should_show_onboarding` (notes.rs) returns
+      # true and the app shows Onboarding.svelte instead of the sidebar.
+      # That's a real, separate fixture gap (no default agent/provider
+      # seeded yet) unrelated to the socket bridge or the screenshot API --
+      # out of scope for this PR, flagged here rather than hidden, and left
+      # for the fixture work the original #470 scope assigns to a later PR.
+      - name: Run smoke e2e test (existing e2e/tests/smoke.spec.ts)
+        run: npx playwright test --config=e2e/playwright.config.ts --project=smoke --grep "Pane app loads and shows content"
+
+      - name: Stop Pane
+        if: always()
+        run: |
+          kill "$(cat /tmp/pane.pid)" 2>/dev/null || true
+          rm -f /tmp/tauri-playwright.sock
+
+      - name: Upload Pane process log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pane-test-log
+          path: /tmp/pane-test.log
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload smoke screenshot (if captured)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pane-smoke-screenshot
+          path: e2e/test-results/smoke.png
+          retention-days: 30
+          if-no-files-found: warn
