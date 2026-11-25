@@ -10,6 +10,8 @@ You write notes, keep sheets, and organize projects and tasks. Your agents read 
 
 **Download:** signed macOS builds and Linux x86_64 builds (.deb, .rpm, and AppImage) are on the [Releases](https://github.com/ThreeLaneStudios/pane/releases/latest) page and at [paneapp.ai](https://paneapp.ai). macOS 11 or later, Apple silicon and Intel. Free.
 
+**Docs:** [https://paneapp.ai/docs](https://paneapp.ai/docs) · **Support:** join us on Discord ([https://discord.com/invite/PhRd2yGwR8](https://discord.com/invite/PhRd2yGwR8))
+
 ## Why Pane
 
 Most people's AI agents aren't loyal to them. The agent lives on someone else's server, runs the model that company picked, and remembers what that company lets it remember. Everything you tell it, that company can read, mine for ads, sell, or hand over when a government asks.
@@ -101,6 +103,8 @@ The connection is `pane-gateway`, a small Rust service in this repo (`src-gatewa
 macOS: download the DMG from [Releases](https://github.com/ThreeLaneStudios/pane/releases/latest), open it, drag Pane to Applications. The build is signed and notarized. On first launch Pane asks for a provider and a key; after that it opens to Home.
 
 Linux: install the .deb, .rpm, or AppImage from the same Releases page. Keys go to the Secret Service keyring. Linux launched alongside macOS but sees less daily use; what is still being finished is tracked in [#249](https://github.com/ThreeLaneStudios/pane/issues/249). Windows is not supported yet ([#250](https://github.com/ThreeLaneStudios/pane/issues/250)).
+
+Stuck? Ask in [Discord](https://discord.com/invite/PhRd2yGwR8). Guides are at [paneapp.ai/docs](https://paneapp.ai/docs).
 
 ## Build from source
 

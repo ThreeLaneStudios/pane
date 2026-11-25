@@ -3,3 +3,9 @@ contact_links:
   - name: Report a vulnerability
     url: https://github.com/ThreeLaneStudios/pane/blob/main/SECURITY.md
     about: Please do not report security vulnerabilities through public GitHub issues. See SECURITY.md for our disclosure process.
+  - name: Need help? Ask in Discord
+    url: https://discord.com/invite/PhRd2yGwR8
+    about: Join the Pane community on Discord for help, questions, and discussion.
+  - name: Read the docs
+    url: https://paneapp.ai/docs
+    about: Guides and documentation for installing and using Pane.
