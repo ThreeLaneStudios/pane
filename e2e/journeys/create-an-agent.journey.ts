@@ -54,11 +54,15 @@ const steps: JourneyStep[] = [
     action: async (tauriPage) => {
       // Picking the provider card advances Step R → Step M and fires
       // fetch_available_models (→ GET /api/tags on the mock Ollama
-      // endpoint, §3 of the PR 4 scope). Opening the search input shows
-      // the fetched model in the dropdown for the screenshot.
+      // endpoint, §3 of the PR 4 scope). The dropdown opens on the input's
+      // `focus` event (SearchableSelect.svelte's handleFocus) -- using
+      // `.focus()` rather than `.click()` here because the plugin's click
+      // command is a bare DOM `el.click()`, which fires a `click` event
+      // only and isn't guaranteed to also focus a text input the way a
+      // real user's click does.
       await tauriPage.click('[data-runtime="ollama"]');
       await tauriPage.waitForSelector('[data-testid="agent-create-model-search-input"]', 10000);
-      await tauriPage.click('[data-testid="agent-create-model-search-input"]');
+      await tauriPage.focus('[data-testid="agent-create-model-search-input"]');
       await tauriPage.waitForSelector('[data-testid="model-option-llama3.2"]', 10000);
     },
   },
@@ -69,7 +73,13 @@ const steps: JourneyStep[] = [
       // Picking the model advances Step M → Step 1, an empty, focused
       // name field — nothing is typed yet in this step's own action, so
       // the screenshot shows the blank field the caption describes.
-      await tauriPage.click('[data-testid="model-option-llama3.2"]');
+      //
+      // Dispatched as `mousedown`, not clicked: SearchableSelect.svelte's
+      // row button only listens for `onmousedown` (so it can
+      // preventDefault() and dodge the input's own blur-before-click
+      // race) -- it has no `onclick` handler at all, so the plugin's
+      // bare `el.click()` would never reach `selectItem()`.
+      await tauriPage.dispatchEvent('[data-testid="model-option-llama3.2"]', 'mousedown');
       await tauriPage.waitForSelector('[data-testid="agent-create-name-input"]', 10000);
     },
   },
