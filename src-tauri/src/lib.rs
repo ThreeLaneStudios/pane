@@ -34,6 +34,15 @@ mod og_fetch; // #1780: og-enrichment for link previews (ADR-0049)
 #[cfg(test)]
 mod onboarding_restore_tests;
 mod projects;
+// #470 PR 3: seeds a real PANE_TEST_DB/PANE_TEST_ROOT fixture (via the real
+// create_local_agent + set_ai_setting commands, never a hand-written INSERT)
+// so e2e-linux.yml's smoke tests launch past onboarding. #[cfg(test)] lib
+// unit test, not a tests/*.rs Cargo integration test — every mod above is
+// private, so create_local_agent is unreachable from outside this crate
+// (see tests/build_v73_fixture.rs's own "private pane_lib functions"
+// comment for why every other fixture generator inlines raw SQL instead).
+#[cfg(test)]
+mod seed_journey_fixture;
 // #2972 stage 1 (tracked on #2874, docs/spec/data-refresh.md §34): the one
 // data-change event's shared name/entity-type/reason constants and the
 // backend `emit()` helper. Used by notes.rs, projects.rs, ai/chat.rs,
