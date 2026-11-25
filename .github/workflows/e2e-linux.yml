@@ -38,17 +38,24 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Hoisted to job level (#470 PR 3) so the new "Seed journey fixture"
-    # step below and the "Start Pane under Xvfb" step always agree on the
-    # exact same paths -- previously these three were inline on the Xvfb
-    # step only; duplicating them onto a second step risked the two
-    # drifting apart.
-    env:
-      PANE_TEST_MODE: "1"
-      PANE_TEST_ROOT: ${{ runner.temp }}/pane-test-root
-      PANE_TEST_DB: ${{ runner.temp }}/pane-test-root/test.db
     steps:
       - uses: actions/checkout@v4
+
+      # `runner.temp` is not available in jobs.<job_id>.env -- the `runner`
+      # context only resolves inside steps. Hoisting it to job level (as a
+      # prior revision of this file did) parses as valid YAML but fails
+      # GitHub's workflow *validation*, which silently produces a stub run
+      # with zero jobs and conclusion "workflow file issue" -- no error
+      # surfaced anywhere else. Computing the paths here, once, from
+      # $RUNNER_TEMP (the env var equivalent, which IS available in `run:`)
+      # and writing them to $GITHUB_ENV keeps the "Seed journey fixture"
+      # step and the "Start Pane under Xvfb" step agreeing on the exact
+      # same paths, without a job-level env: block.
+      - name: Compute test paths (PANE_TEST_MODE/ROOT/DB)
+        run: |
+          echo "PANE_TEST_MODE=1" >> "$GITHUB_ENV"
+          echo "PANE_TEST_ROOT=${RUNNER_TEMP}/pane-test-root" >> "$GITHUB_ENV"
+          echo "PANE_TEST_DB=${RUNNER_TEMP}/pane-test-root/test.db" >> "$GITHUB_ENV"
 
       - name: Install Tauri 2.x Linux build dependencies
         run: |
