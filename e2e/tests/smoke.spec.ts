@@ -152,15 +152,17 @@ test('Pane app loads and shows content', async ({ tauriPage }) => {
   const screenshotBuffer = await tauriPage.screenshot({ path: SCREENSHOT_PATH });
   console.log('Screenshot captured:', screenshotBuffer ? 'yes' : 'no', 'bytes:', screenshotBuffer?.length);
 
-  // The returned buffer must be non-empty...
-  expect(screenshotBuffer).toBeTruthy();
-  expect(screenshotBuffer.length).toBeGreaterThan(0);
+  // tauri-plugin-playwright 0.4.1 writes the PNG to disk and returns an
+  // EMPTY buffer whenever a `path` is passed to screenshot() -- the
+  // returned buffer is only populated when no `path` is given (hence
+  // "bytes: 0" in the log line above on a successful capture). So the
+  // returned buffer is not a usable signal here; everything below is
+  // checked against the file on disk instead.
 
-  // ...and it must actually have landed on disk at the path the workflow
-  // uploads from, matching what was returned.
+  // It must actually have landed on disk at the path the workflow
+  // uploads from.
   expect(fs.existsSync(SCREENSHOT_PATH)).toBe(true);
   const onDisk = fs.readFileSync(SCREENSHOT_PATH);
-  expect(onDisk.equals(screenshotBuffer)).toBe(true);
 
   // A sane byte size rules out an empty or truncated file. This alone
   // does NOT rule out a blank frame (see analyzeVariation below) -- a
