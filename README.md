@@ -10,7 +10,7 @@ You write notes, keep sheets, and organize projects and tasks. Your agents read 
 
 **Download:** signed macOS builds and Linux x86_64 builds (.deb, .rpm, and AppImage) are on the [Releases](https://github.com/ThreeLaneStudios/pane/releases/latest) page and at [paneapp.ai](https://paneapp.ai). macOS 11 or later, Apple silicon and Intel. Free.
 
-**Docs:** [https://paneapp.ai/docs](https://paneapp.ai/docs) · **Support:** join us on Discord ([https://discord.com/invite/PhRd2yGwR8](https://discord.com/invite/PhRd2yGwR8))
+**Docs:** [https://paneapp.ai/docs](https://paneapp.ai/docs) · **Support:** join us on Discord · [https://discord.com/invite/PhRd2yGwR8](https://discord.com/invite/PhRd2yGwR8)
 
 ## Why Pane
 
