@@ -72,10 +72,10 @@ Grep-based pattern matching that enforces hard rules from `docs/INVARIANTS.md`:
 
 Legitimate legacy code paths are marked with `// legacy-ok` comments. The grep excludes these markers, comments, test files, and function definitions. New invariants can be added to both `INVARIANTS.md` and this check as architecture decisions are made.
 
-#### Layer 5 (Future): End-to-End Tests
-> **Status:** PARTIAL — 4 Playwright specs exist, not in CI
+#### Layer 5: End-to-End Tests and Journeys
+> **Status:** PARTIAL — Playwright specs exist and drive the real app; journeys are specified in §25.13
 
-Playwright E2E tests exist but aren't in the CI pipeline yet. Adding them requires a headed browser environment or Tauri test harness. Future work.
+Playwright specs drive the real Pane app through `tauri-plugin-playwright`. They do not run on pull requests. Journeys (§25.13) are the end-to-end layer going forward.
 
 ### 25.3 CI Pipeline
 
@@ -403,6 +403,72 @@ When implementing `src-tauri/src/ai/tests/recovery_tests.rs`:
 
 ---
 
+### 25.13 Journeys
+> **Status:** PLANNED
+> **GitHub Issue:** #470
+> **Cross-references:** §25.2 Layer 5, `e2e/`, `release-publish.yml`
+
+A journey is a script that clicks through the real Pane app, one how-to at a time (for example, "Create an agent"). Each journey has two outputs from the same script:
+
+1. **A test** — every step either works or fails.
+2. **A docs page** — one screenshot and one caption per step, published to paneapp.ai/docs.
+
+Because the docs page is generated from a script that must pass, a page cannot describe a flow that no longer works.
+
+#### Tool
+
+Journeys use the Playwright bridge already in the repo (`tauri-plugin-playwright` with `@srsholmes/tauri-playwright`). It drives the real app and already exposes `screenshot()`. Switching tools would add a new dependency and a second debug-only plugin for no gain. If screenshots fail against the app, the fallback is upgrading the client, not changing tools.
+
+#### Where journeys run
+
+- GitHub-hosted Linux runners, under a virtual display.
+- Against the test fixture only (`PANE_TEST_ROOT`, `PANE_TEST_DB`, `PANE_TEST_MODE`): a throwaway Pane folder, never real user data.
+- Against a mock Ollama endpoint. No real model calls, no tokens, no provider keys.
+
+Nothing at run time depends on an AI model or a scheduled job.
+
+#### When journeys run
+
+| Trigger | What it does |
+| --- | --- |
+| Bump PR | Runs every journey as a test and posts a pass or fail list, before Matt's live test. No screenshots are kept. |
+| Public release tag (`vX.Y.Z`) | Runs every journey once against the released build, saves the screenshots, and rebuilds the docs pages. |
+| Manual (`workflow_dispatch`) | Runs on demand. |
+
+Journeys do not run on ordinary pull requests. A journey broken by an ordinary PR surfaces at the next bump. Dev prereleases do not rebuild the docs.
+
+#### Rules for writing a journey
+
+1. **One journey per how-to.** Name it for what the user is trying to do.
+2. **Every step has an action, a caption, and a screenshot.** Captions live in the journey file, next to the step they describe.
+3. **Captions are written for the end user**, in plain language. Matt approves the captions of the first journey; later journeys follow that pattern.
+4. **Select elements by `data-testid`.** Adding one to a core-behavioral file (for example `Onboarding.svelte` or `Settings.svelte`) needs a spec touch, as any change to those files does.
+5. **Paid providers are captured up to the setup screens only.** A journey never needs a real key.
+6. **A PR that changes a covered flow updates its journey in the same PR.**
+
+#### New features
+
+A feature's spec names the journey that covers it (the `Journey:` field in the spec template). A user-facing feature is not complete until that journey exists.
+
+#### Docs build
+
+A template turns each journey's steps into a docs page. On a public release tag, a workflow rebuilds the pages and opens a pull request against the `release` branch of the site repo (`paneapp-ai`). Matt merges it, and merging deploys the site. The workflow can open pull requests but cannot merge.
+
+#### When a journey fails
+
+- A step is retried, and a whole journey is retried once.
+- At a bump, the failure is reported in the pass or fail list.
+- At release, a failing journey affects only its own page. That page stays at its last good version, the rest of the docs still rebuild, and the pull request says which page was skipped.
+
+#### Shipped-build safety
+
+The Playwright plugin is registered only under `#[cfg(debug_assertions)]` (`lib.rs`). `release-publish.yml` scans the release binary for the plugin's symbols and fails the release if any are present, so the test hooks cannot reach a shipped build.
+
+#### Not covered yet
+
+Video walkthroughs, bots that explore the app freely, and a tool that lets an agent drive the app directly.
+
+---
 
 ### Test Isolation Requirements
 
