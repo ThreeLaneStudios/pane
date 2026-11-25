@@ -38,6 +38,15 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Hoisted to job level (#470 PR 3) so the new "Seed journey fixture"
+    # step below and the "Start Pane under Xvfb" step always agree on the
+    # exact same paths -- previously these three were inline on the Xvfb
+    # step only; duplicating them onto a second step risked the two
+    # drifting apart.
+    env:
+      PANE_TEST_MODE: "1"
+      PANE_TEST_ROOT: ${{ runner.temp }}/pane-test-root
+      PANE_TEST_DB: ${{ runner.temp }}/pane-test-root/test.db
     steps:
       - uses: actions/checkout@v4
 
@@ -86,11 +95,24 @@ jobs:
         working-directory: src-tauri
         run: cargo build --bin pane --features tauri/custom-protocol
 
+      # #470 PR 3: seeds a real ai_agents row (is_default=1, is_active=1,
+      # runtime_type='ollama') through the real create_local_agent command,
+      # at the exact PANE_TEST_DB/PANE_TEST_ROOT path the "Start Pane"
+      # step below launches against -- so should_show_onboarding (notes.rs)
+      # resolves past onboarding instead of showing Onboarding.svelte. No
+      # committed database file, no hand-written SQL -- see
+      # src-tauri/src/seed_journey_fixture.rs's own doc comment for the
+      # full mechanism and why it's a lib unit test, not a tests/*.rs
+      # integration test. #[ignore]-gated so it never runs in the default
+      # `cargo test` sweep (ci.yml); invoked explicitly here via
+      # --ignored.
+      - name: Seed journey fixture (so Pane starts past onboarding)
+        working-directory: src-tauri
+        run: |
+          mkdir -p "$PANE_TEST_ROOT"
+          cargo test --lib seed_journey_fixture -- --ignored --nocapture
+
       - name: Start Pane under Xvfb, wait for the test socket
-        env:
-          PANE_TEST_MODE: "1"
-          PANE_TEST_ROOT: ${{ runner.temp }}/pane-test-root
-          PANE_TEST_DB: ${{ runner.temp }}/pane-test-root/test.db
         run: |
           mkdir -p "$PANE_TEST_ROOT"
           rm -f /tmp/tauri-playwright.sock
@@ -113,17 +135,13 @@ jobs:
           fi
 
       # Runs the EXISTING e2e/tests/smoke.spec.ts (no new test content).
-      # Scoped via --grep to the one test that calls tauriPage.screenshot()
-      # -- the other test in this file ("Pane sidebar is visible") waits
-      # for `.sidebar`, which a brand-new PANE_TEST_DB never renders: zero
-      # seeded agents means `should_show_onboarding` (notes.rs) returns
-      # true and the app shows Onboarding.svelte instead of the sidebar.
-      # That's a real, separate fixture gap (no default agent/provider
-      # seeded yet) unrelated to the socket bridge or the screenshot API --
-      # out of scope for this PR, flagged here rather than hidden, and left
-      # for the fixture work the original #470 scope assigns to a later PR.
+      # Both tests now run: the "Seed journey fixture" step above means a
+      # default ollama agent exists before Pane launches, so
+      # should_show_onboarding (notes.rs) resolves past onboarding and
+      # ".sidebar" actually renders -- "Pane sidebar is visible" no longer
+      # needs excluding via --grep.
       - name: Run smoke e2e test (existing e2e/tests/smoke.spec.ts)
-        run: npx playwright test --config=e2e/playwright.config.ts --project=smoke --grep "Pane app loads and shows content"
+        run: npx playwright test --config=e2e/playwright.config.ts --project=smoke
 
       - name: Stop Pane
         if: always()
@@ -149,11 +167,17 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-      - name: Upload smoke screenshot (if captured)
+      - name: Upload smoke screenshot
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pane-smoke-screenshot
           path: e2e/test-results/smoke.png
           retention-days: 30
-          if-no-files-found: warn
+          # warn -> error (#470 PR 3, PR #472 final audit §9): a real file
+          # exists on every passing run now, asserted by the test itself
+          # (captureAndValidateScreenshot's fs.existsSync check) -- a
+          # missing artifact here is a regression that should fail the
+          # job loudly, not the silent-warn state that let a broken run
+          # go green before PR #472's fix.
+          if-no-files-found: error
