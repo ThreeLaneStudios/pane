@@ -70,23 +70,43 @@ const steps: JourneyStep[] = [
       await tauriPage.waitForSelector('[data-testid="agents-captain-crew-helper"]', 10000);
       expect(await tauriPage.getByText('+ New agent', { exact: true }).isVisible()).toBe(true);
       // Round 3 (Reed's audit): screenshot 01 was still showing "General"
-      // highlighted in the tab bar, not "Agents" -- a CSS-transition
-      // timing artefact, the screenshot firing before the active-tab
-      // class settles. Fixed here, not by adding a sleep: `waitForFunction`
-      // polls the real DOM (same auto-waiting idiom `waitForSelector`
-      // already uses elsewhere in this file) until the Agents tab button
-      // itself (Settings.svelte's `class:active={activeTab === 'agents'}`)
-      // genuinely carries the "active" class -- waiting out the
-      // transition rather than racing it, then asserted explicitly below
-      // so a regression here fails loudly, not silently.
-      await tauriPage.waitForFunction(
-        `Array.from(document.querySelectorAll('button')).some(el => el.textContent.trim() === 'Agents' && el.classList.contains('active'))`,
-        10000
-      );
-      const agentsTabIsActive = await tauriPage.evaluate(
-        `Array.from(document.querySelectorAll('button')).some(el => el.textContent.trim() === 'Agents' && el.classList.contains('active'))`
-      );
-      expect(agentsTabIsActive).toBe(true);
+      // highlighted in the tab bar, not "Agents". First attempt here
+      // checked the Agents button's own `class:active` membership
+      // (Settings.svelte's `class:active={activeTab === 'agents'}`) --
+      // that class flips the instant `activeTab` changes, same reactive
+      // tick as the click, so it was already true well before the
+      // screenshot and did not catch the real defect: `.seg-btn.active`
+      // (Settings.svelte CSS) carries `transition: all 0.2s` -- the class
+      // is applied immediately, but the actual PAINTED background/
+      // box-shadow animates for up to 200ms afterward, and a screenshot
+      // taken in that window can still show General's box mid-fade-out
+      // and/or Agents' box not yet faded in. A class check can never
+      // catch that -- it has to read the real, rendered style.
+      //
+      // Fixed by polling the two buttons' own computed
+      // `background-color` alpha directly (`getComputedStyle`, read
+      // fresh on every `waitForFunction` poll -- no event listener, so no
+      // race with a transition that may already be finishing by the time
+      // this runs) until the Agents button is genuinely, visibly more
+      // opaque than General by a real margin -- the exact visual fact
+      // Reed's screenshot review was checking for, not a proxy for it.
+      // No bare sleep: this waits out the transition's actual paint,
+      // it does not guess a fixed delay.
+      const activeTabContrastExpr = `(() => {
+        function alphaOf(btn) {
+          const m = getComputedStyle(btn).backgroundColor.match(/rgba?\\(([^)]+)\\)/);
+          if (!m) return 0;
+          const parts = m[1].split(',').map(s => parseFloat(s.trim()));
+          return parts.length === 4 ? parts[3] : 1;
+        }
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const agentsBtn = buttons.find(el => el.textContent.trim() === 'Agents');
+        const generalBtn = buttons.find(el => el.textContent.trim() === 'General');
+        if (!agentsBtn || !generalBtn) return false;
+        return (alphaOf(agentsBtn) - alphaOf(generalBtn)) > 0.05;
+      })()`;
+      await tauriPage.waitForFunction(activeTabContrastExpr, 10000);
+      expect(await tauriPage.evaluate(activeTabContrastExpr)).toBe(true);
     },
   },
   {
