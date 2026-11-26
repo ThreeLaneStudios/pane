@@ -180,6 +180,18 @@ const steps: JourneyStep[] = [
     },
     check: async (tauriPage) => {
       expect(await tauriPage.inputValue('[data-testid="agent-create-name-input"]')).toBe('Research Agent');
+      // Reed's audit (docs/audits/2026-11-26-scope-470-fonts.md §3): the
+      // name field being filled does NOT mean the Create button is ready
+      // to screenshot. AgentCreateOverlay.svelte's handleNameInput
+      // (:330-343) arms a 300ms debounce, then awaits a real
+      // checkNameCollision() IPC round-trip, before ctaDisabled (:269-271)
+      // settles back to false -- a screenshot taken inside that window
+      // (as the last run's did) shows a correctly-filled name next to a
+      // disabled, greyed Create button. This is a genuine async-state
+      // race, not a round-3-style paint lag: the `disabled` attribute
+      // mirrors `ctaDisabled` synchronously, so waiting on the real DOM
+      // attribute (not a fixed delay) is the correct, non-sleep fix.
+      await tauriPage.waitForSelector('[data-testid="agent-create-cta"]:not([disabled])', 10000);
     },
   },
   {
