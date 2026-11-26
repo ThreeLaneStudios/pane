@@ -809,6 +809,7 @@
             selectedModel={selectedModel ?? ''}
             placeholder="Search models... (e.g. Claude, GPT, Gemini)"
             onSelect={(modelId) => handlePickModel(modelId)}
+            testId="agent-create-model-search-input"
           />
         </div>
       {/if}
@@ -837,6 +838,7 @@
           type="text"
           class="agent-name-input"
           class:agent-name-input--error={hasCollision}
+          data-testid="agent-create-name-input"
           placeholder="e.g. Research Agent"
           bind:value={agentName}
           oninput={handleNameInput}
@@ -868,6 +870,7 @@
         <!-- §10.6: while collision error shows, CTA reads "Enter a different name" (disabled) -->
         <button
           class="ag-btn ag-btn--primary"
+          data-testid="agent-create-cta"
           onclick={handleCreate}
           disabled={ctaDisabled}
         >
@@ -896,7 +899,7 @@
             <div class="path-title">Answer a Few Questions</div>
             <div class="path-desc">Quick 5-question interview to build your agent’s personality and context.</div>
           </button>
-          <button class="path-card" onclick={handleJustChat}>
+          <button class="path-card" data-testid="agent-create-seed-skip" onclick={handleJustChat}>
             <div class="path-title">Just Start Chatting</div>
             <div class="path-desc">Start fresh. Refine your agent over time.</div>
           </button>

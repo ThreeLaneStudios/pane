@@ -39,9 +39,15 @@
     // Optional + defaults to hidden (see below) so a call site that omits it
     // fails safe (no box) rather than silently exposing one.
     provider?: string;
+    // #470 PR 4: forwarded unchanged into the wrapped <SearchableSelect>'s
+    // own `testId` prop (already declared/rendered there -- see that
+    // file's header comment for the split rationale). Optional, additive;
+    // every existing caller that omits it keeps rendering with no
+    // `data-testid` on the input, same as before this prop existed.
+    testId?: string;
   }
 
-  let { models, selectedModel = '', placeholder = 'Search models...', onSelect, provider }: Props = $props();
+  let { models, selectedModel = '', placeholder = 'Search models...', onSelect, provider, testId }: Props = $props();
 
   // #3083: custom-model free-text entry is only safe where the provider's own
   // model list is itself incomplete by design — OpenRouter aggregates a huge,
@@ -206,6 +212,8 @@
   footer={showCustomModelBox ? customModelFooter : undefined}
   containerClass="searchable-model-select"
   inputClass="model-input"
+  {testId}
+  testIdForItem={(item) => `model-option-${(item as Model).id}`}
 />
 
 {#if customModelPromptOpen}

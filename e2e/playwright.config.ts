@@ -30,6 +30,19 @@ export default defineConfig({
       testDir: './tests/tier3',
       timeout: 60000,
     },
+    // #470 PR 4: journeys live under their own testDir (e2e/journeys/),
+    // sibling to tests/ -- a journey is a *.journey.ts file, never swept
+    // into tier1/2/3 by that directory split. retries: 1 is Matt's
+    // ruling (journey-level retry limit) -- step-level flake is already
+    // absorbed by TauriPage's own auto-waiting click/fill; this is a
+    // whole-journey safety net, not a new per-step mechanism.
+    {
+      name: 'journeys',
+      testDir: './journeys',
+      testMatch: /\.journey\.ts$/,
+      timeout: 60000,
+      retries: 1,
+    },
   ],
   
   reporter: [

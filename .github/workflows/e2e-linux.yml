@@ -25,6 +25,20 @@ name: E2E — Linux Smoke (plumbing proof)
 # file's own path only, so this PR can prove itself green (or honestly
 # red) before merge, without adding CI time to any other PR -- it is not a
 # general PR trigger and does not violate §25.13's rule.
+#
+# #470 PR 4: this same job now also runs the first journey
+# (e2e/journeys/create-an-agent.journey.ts) against the same already-
+# running Pane process the smoke tests use, against a mock Ollama
+# endpoint (e2e/journeys/mock-ollama.mjs) -- the only live network call
+# this journey forces, per the PR 4 scope's own trace. This keeps the
+# journey's first real CI proof on the one workflow file already proven
+# to self-trigger on a PR via the `paths:` filter below (this file's own
+# path), rather than adding a second workflow file with no equivalent
+# trigger for this PR to prove itself against. A standalone
+# `journeys.yml` (workflow_dispatch + bump-PR + release-tag triggers) is
+# still the right home for this journey on an ongoing basis -- out of
+# scope for this PR, which only needs to prove the journey runs green on
+# Linux once, the same bar PR 2 set for the smoke tests.
 on:
   workflow_dispatch:
   pull_request:
@@ -113,6 +127,42 @@ jobs:
       # integration test. #[ignore]-gated so it never runs in the default
       # `cargo test` sweep (ci.yml); invoked explicitly here via
       # --ignored.
+      # #470 PR 4: started before the seed step (which writes
+      # MOCK_OLLAMA_ENDPOINT into the seeded ollama_endpoint setting) and
+      # before Pane launches -- order matters so the seed step has the
+      # mock's real bound port to write, and so the one unconditional
+      # startup dial (lib.rs's eager ModelRegistry populate) has
+      # something listening from the first launch instant.
+      # #470 PR 474 round 2: fixed port 11434 (Ollama's own real default)
+      # inside mock-ollama.mjs now, not an ephemeral `:0` -- so the
+      # "Choose a provider" screenshot shows a real-looking
+      # `http://127.0.0.1:11434` instead of an arbitrary port. Still read
+      # off the one stdout line mock-ollama.mjs prints, same wait-loop
+      # idiom as "Start Pane under Xvfb" below -- this step's own shell
+      # logic needs no change for that.
+      - name: Start mock Ollama endpoint
+        run: |
+          node e2e/journeys/mock-ollama.mjs > /tmp/mock-ollama.log 2>&1 &
+          echo $! > /tmp/mock-ollama.pid
+          PORT=""
+          for i in $(seq 1 20); do
+            PORT=$(grep -oE 'MOCK_OLLAMA_PORT=[0-9]+' /tmp/mock-ollama.log | cut -d= -f2)
+            if [ -n "$PORT" ]; then
+              echo "MOCK_OLLAMA_ENDPOINT=http://127.0.0.1:${PORT}" >> "$GITHUB_ENV"
+              echo "✅ mock Ollama listening on :${PORT}"
+              break
+            fi
+            sleep 0.5
+          done
+          if [ -z "$PORT" ]; then
+            echo "❌ mock Ollama did not report a port after 10s"; cat /tmp/mock-ollama.log; exit 1
+          fi
+
+      # #470 PR 4: reads MOCK_OLLAMA_ENDPOINT (set by the step above) and
+      # seeds that as the ollama_endpoint setting instead of the inert
+      # 127.0.0.1:1 address -- additive env override in
+      # seed_journey_fixture.rs, PR 3's own smoke-only invocation of this
+      # same test is unaffected when that var is unset.
       - name: Seed journey fixture (so Pane starts past onboarding)
         working-directory: src-tauri
         run: |
@@ -150,11 +200,27 @@ jobs:
       - name: Run smoke e2e test (existing e2e/tests/smoke.spec.ts)
         run: npx playwright test --config=e2e/playwright.config.ts --project=smoke
 
+      # #470 PR 4: the first journey, against the SAME already-running Pane
+      # process the smoke test above just used. e2e/journeys/create-an-
+      # agent.journey.ts writes one PNG per step + manifest.json to
+      # e2e/journeys-output/create-an-agent/ (the "Upload journey artifact"
+      # step below uploads that whole directory as one artifact). Round 2
+      # (PR 474) added an opening step -- 6 steps/PNGs now, not 5.
+      - name: Run "Create an agent" journey
+        run: npx playwright test --config=e2e/playwright.config.ts --project=journeys
+
       - name: Stop Pane
         if: always()
         run: |
           kill "$(cat /tmp/pane.pid)" 2>/dev/null || true
           rm -f /tmp/tauri-playwright.sock
+
+      # #470 PR 4: new state this PR introduces (a second background
+      # process) needs its own teardown, parallel to "Stop Pane" above --
+      # the mock never writes to disk, so there's nothing else to clean up.
+      - name: Stop mock Ollama
+        if: always()
+        run: kill "$(cat /tmp/mock-ollama.pid)" 2>/dev/null || true
 
       - name: Upload Pane process log
         if: always()
@@ -187,4 +253,22 @@ jobs:
           # missing artifact here is a regression that should fail the
           # job loudly, not the silent-warn state that let a broken run
           # go green before PR #472's fix.
+          if-no-files-found: error
+
+      # #470 PR 4: one artifact holding every step's PNG plus
+      # manifest.json -- the entire e2e/journeys-output/create-an-agent/
+      # directory, matching the per-journey-subdirectory layout the
+      # runner (_runner.ts) writes so a later second journey doesn't
+      # collide with this one's files. error (not warn): manifest.json is
+      # only ever written after every step succeeds (_runner.ts), and
+      # each step's own screenshot is already asserted to exist by
+      # captureAndValidateScreenshot -- a missing artifact here means the
+      # job should already have failed loudly before reaching this step.
+      - name: Upload journey artifact (create-an-agent)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pane-journey-create-an-agent
+          path: e2e/journeys-output/create-an-agent/
+          retention-days: 30
           if-no-files-found: error
