@@ -50,6 +50,49 @@
 //! `fetch_ollama_models` -> `GET {endpoint}/api/tags`) gets a real,
 //! fixed-response model list instead of an instant `ECONNREFUSED`.
 //!
+//! #470 PR 474 round 3 (Reed's Ruling 3): this test now loads the crsqlite
+//! extension before running migrations, the same way the real binary does.
+//! Before this fix, `init_database(None)` stamped the fresh test DB at the
+//! current `SCHEMA_VERSION` with CRR never enabled on any table; the real
+//! `pane` binary launched next *with* the extension, saw a schema version
+//! that already matched, skipped migration entirely, and `verify_crr_tables`
+//! (the migration-skip path's own sanity check) then failed for `projects`
+//! — a real `[CRITICAL] Migration failed: CRR verification failed` line in
+//! `pane-test.log`, caused by this fixture's own shortcut, not a shipping
+//! defect (a genuine fresh install always loads the extension from its
+//! first launch, so it can never reach this state). Fixed by passing
+//! `Some(crsqlite_path)` to the exact same `database::init_database` the
+//! real binary calls, instead of `None` -- the loading mechanism itself
+//! (`database::load_crsqlite_extension`, reached through `init_database`)
+//! is reused completely unchanged; only *locating* the `.so`/`.dylib` on
+//! disk needed test-specific handling, and even that is empirically
+//! verified against the real binary's own resolution below, not guessed.
+//!
+//! Resolving the path: `lib.rs`'s `.setup()` calls
+//! `app.path().resource_dir()` (a real `AppHandle`, which this
+//! `#[cfg(test)]` module never has) then joins `"resources"` +
+//! `CRSQLITE_FILENAME`. Checked empirically rather than assumed: the
+//! compiled `pane` debug binary itself prints `✓ Loaded cr-sqlite
+//! extension from ".../target/debug/resources/crsqlite.dylib"` on a real
+//! launch, confirming `app.path().resource_dir()` resolves to
+//! `target/debug` for that binary (exe's own parent dir) --
+//! `tauri::test::mock_app()`'s `resource_dir()` does NOT reproduce this:
+//! probed directly, it returns `target/debug/resources` already (one
+//! level too deep for the same `.join("resources")` lib.rs applies,
+//! confirmed by a scratch probe test, output discarded). A `cargo test
+//! --lib` binary's own `current_exe()` also sits one level deeper than the
+//! real `pane` binary's (`target/debug/deps/pane_lib-<hash>`, not
+//! `target/debug/pane`), for the unrelated reason that cargo nests test
+//! binaries under `deps/`. `crsqlite_resource_path()` below walks up from
+//! `current_exe()` far enough to land on whichever ancestor directory
+//! actually has a `resources/<FILENAME>` sitting in it on disk (populated
+//! by `tauri-build`'s build script during `cargo build`, confirmed to run
+//! for a plain `cargo build`/`cargo test`, not only `tauri build`) --
+//! landing on the exact same `target/<profile>/resources/<FILENAME>` file
+//! the real binary itself loads, regardless of which nesting depth this
+//! particular test binary happens to sit at. This is locating a file on
+//! disk, not reimplementing or stubbing the extension load itself.
+//!
 //! Run with (from `src-tauri/`):
 //!   cargo test --lib seed_journey_fixture -- --ignored --nocapture
 //!
@@ -63,7 +106,33 @@ mod tests {
     use crate::agents::{create_local_agent, CreateLocalAgentRequest};
     use crate::database::{self, DbState};
     use rusqlite::Connection;
+    use std::path::PathBuf;
     use tauri::Manager;
+
+    // `#[cfg(target_os)]` filenames match lib.rs's own
+    // `CRSQLITE_FILENAME` constants verbatim -- same three platforms,
+    // same names, same `tauri.conf.json` `bundle.resources` entries.
+    #[cfg(target_os = "macos")]
+    const CRSQLITE_FILENAME: &str = "crsqlite.dylib";
+    #[cfg(target_os = "linux")]
+    const CRSQLITE_FILENAME: &str = "crsqlite.so";
+    #[cfg(target_os = "windows")]
+    const CRSQLITE_FILENAME: &str = "crsqlite.dll";
+
+    /// Finds the crsqlite extension file this test binary's own build
+    /// produced, by walking up from `current_exe()` -- see this module's
+    /// doc comment above for why a fixed join count (what `lib.rs` itself
+    /// uses against a real `AppHandle`) doesn't transfer to a `cargo test`
+    /// binary, and why this is locating a file, not reimplementing how
+    /// it's loaded. Bounded at 6 ancestors so a genuine absence (resources
+    /// never built) fails fast with `None` instead of walking to `/`.
+    fn crsqlite_resource_path() -> Option<PathBuf> {
+        let exe = std::env::current_exe().ok()?;
+        exe.ancestors().skip(1).take(6).find_map(|dir| {
+            let candidate = dir.join("resources").join(CRSQLITE_FILENAME);
+            candidate.exists().then_some(candidate)
+        })
+    }
 
     /// Inert, fast-refusing: nothing is bound on port 1, so a connection
     /// attempt gets `ECONNREFUSED` near-instantly on Linux rather than
@@ -105,14 +174,29 @@ mod tests {
         // Step 1: the exact migration path the app itself runs on first
         // launch (`init_database` -> `init_database_with_progress` ->
         // `run_migrations`), at the exact `PANE_TEST_DB` path the app will
-        // open next. `None` for the crsqlite extension path: CRR tracking
-        // is irrelevant to the onboarding gate and to either smoke test --
-        // the same no-extension shape every other `run_migrations` unit
-        // test in this crate already uses (including
-        // `upsert_agent_explicit_runtime_type_tests::setup()` in
-        // agents.rs).
-        let conn: Connection =
-            database::init_database(None).expect("seed_journey_fixture: init_database failed");
+        // open next. Round 3: `Some(crsqlite_path)`, not `None` -- CRR
+        // tracking DOES matter here even though the onboarding gate itself
+        // never reads it, because the REAL `pane` binary launches next
+        // *with* this same extension loaded (`lib.rs`'s `.setup()`); a
+        // schema stamped without CRR enabled, read back by a connection
+        // that has the extension loaded, is exactly the mismatch Reed's
+        // Ruling 3 traced to the `[CRITICAL]` log line -- see this file's
+        // module doc comment above. Every OTHER `run_migrations` unit test
+        // in this crate (including `upsert_agent_explicit_runtime_type_
+        // tests::setup()` in agents.rs) stays on the no-extension shape
+        // deliberately: none of them launch the real compiled binary
+        // against their DB afterward, so none of them can hit this
+        // mismatch -- this fixture is the one caller where it matters.
+        let crsqlite_path = crsqlite_resource_path();
+        assert!(
+            crsqlite_path.is_some(),
+            "seed_journey_fixture: could not find {CRSQLITE_FILENAME} under any ancestor \
+             of {:?} -- `cargo build` (which copies tauri.conf.json's bundle.resources via \
+             tauri-build's build script) must run before this test.",
+            std::env::current_exe()
+        );
+        let conn: Connection = database::init_database(crsqlite_path)
+            .expect("seed_journey_fixture: init_database failed");
 
         let app = tauri::test::mock_app();
         app.manage(DbState::new(conn));

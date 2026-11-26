@@ -28,20 +28,22 @@
 // captures the screenshot, so the image always shows the screen the
 // step's own caption is describing, proven rather than assumed.
 //
-// Round 2's one structural wrinkle (steps 'choose-model' and
-// 'name-your-agent'): selecting a model
+// Round 3's fix for the same wrinkle round 2 worked around (steps
+// 'choose-model' and 'name-your-agent'): selecting a model
 // (AgentCreateOverlay.svelte's `handlePickModel`) advances Step M → Step 1
 // synchronously -- there is no app state where a model is "selected" AND
 // the model-picker screen is still on screen, short of an app-code change
-// (out of scope, forbidden for this PR). The "← Back" button on Step 1
-// does NOT reset `selectedModel` (only "Skip — decide later" does), so
-// selecting the model, then going back, is the one real, existing-UI path
-// that puts the picker back on screen with the choice still visible and
-// filled into the search field — traced directly against the component's
-// own step-transition handlers, not a new behavior added for this test.
-// 'name-your-agent' then re-opens the picker and re-selects the same
-// model to advance for real, exactly as a user who'd hit Back to double
-// check their choice would do next.
+// (out of scope, forbidden for this PR). Round 2's workaround was a real,
+// existing-UI path (select → "← Back", which does not reset
+// `selectedModel` → re-select) but Matt didn't want a reader walking a
+// path no real user would take. Round 3 instead screenshots the moment
+// BEFORE the click: 'choose-model' opens the picker and waits for the
+// target option to be visible in the open list -- the check asserts
+// exactly that -- then its screenshot captures the list with the option
+// found but not yet selected. 'name-your-agent' clicks that same option
+// first (the actual selection), then fills the name field, same as any
+// other step whose action continues from where the previous one left the
+// screen.
 import { test, expect } from '../fixtures';
 import { runJourney, type JourneyStep, type Journey } from './_runner';
 
@@ -67,6 +69,24 @@ const steps: JourneyStep[] = [
       // other screen that happens to share wording.
       await tauriPage.waitForSelector('[data-testid="agents-captain-crew-helper"]', 10000);
       expect(await tauriPage.getByText('+ New agent', { exact: true }).isVisible()).toBe(true);
+      // Round 3 (Reed's audit): screenshot 01 was still showing "General"
+      // highlighted in the tab bar, not "Agents" -- a CSS-transition
+      // timing artefact, the screenshot firing before the active-tab
+      // class settles. Fixed here, not by adding a sleep: `waitForFunction`
+      // polls the real DOM (same auto-waiting idiom `waitForSelector`
+      // already uses elsewhere in this file) until the Agents tab button
+      // itself (Settings.svelte's `class:active={activeTab === 'agents'}`)
+      // genuinely carries the "active" class -- waiting out the
+      // transition rather than racing it, then asserted explicitly below
+      // so a regression here fails loudly, not silently.
+      await tauriPage.waitForFunction(
+        `Array.from(document.querySelectorAll('button')).some(el => el.textContent.trim() === 'Agents' && el.classList.contains('active'))`,
+        10000
+      );
+      const agentsTabIsActive = await tauriPage.evaluate(
+        `Array.from(document.querySelectorAll('button')).some(el => el.textContent.trim() === 'Agents' && el.classList.contains('active'))`
+      );
+      expect(agentsTabIsActive).toBe(true);
     },
   },
   {
@@ -87,7 +107,7 @@ const steps: JourneyStep[] = [
   },
   {
     name: 'choose-model',
-    caption: `Choose a model. Search for a model and select it. You can change the model later in the agent's settings.`,
+    caption: `Choose a model. Search for a model, then click it in the list to select it. You can change the model later in the agent's settings.`,
     action: async (tauriPage) => {
       // Picking the provider card advances Step R → Step M and fires
       // fetch_available_models (→ GET /api/tags on the mock Ollama
@@ -102,44 +122,38 @@ const steps: JourneyStep[] = [
       await tauriPage.focus('[data-testid="agent-create-model-search-input"]');
       await tauriPage.waitForSelector('[data-testid="model-option-llama3.2"]', 10000);
 
-      // Dispatched as `mousedown`, not clicked: SearchableSelect.svelte's
-      // row button only listens for `onmousedown` (so it can
-      // preventDefault() and dodge the input's own blur-before-click
-      // race) -- it has no `onclick` handler at all, so the plugin's
-      // bare `el.click()` would never reach `selectItem()`.
-      //
-      // This commits the selection and advances Step M → Step 1 (Name)
-      // immediately -- see this file's own header comment. Going back
-      // from there returns to THIS screen with `selectedModel` intact
-      // (the Back button on Step 1 never resets it), which is how this
-      // step's own screenshot ends up showing a model actually chosen
-      // instead of an empty, unselected picker.
-      await tauriPage.dispatchEvent('[data-testid="model-option-llama3.2"]', 'mousedown');
-      await tauriPage.waitForSelector('[data-testid="agent-create-name-input"]', 10000);
-      await tauriPage.getByText('← Back', { exact: true }).click();
-      await tauriPage.waitForSelector('[data-testid="agent-create-model-search-input"]', 10000);
+      // Round 3: deliberately does NOT click the option. Selecting it
+      // (SearchableSelect.svelte's `selectItem()`) advances Step M → Step
+      // 1 synchronously -- there is no app state where the model is
+      // "selected" AND the picker is still on screen, short of an
+      // app-code change (out of scope). Rather than walk a path no real
+      // user would take to fake that state (round 2's select → Back →
+      // re-select), this step stops here: the list is open and the
+      // target option is visible, in the DOM, in the list the user is
+      // actually searching -- the moment before the click, not a state
+      // the app passes through after it. The click itself happens as the
+      // next step's action (see 'name-your-agent' below).
     },
     check: async (tauriPage) => {
-      // Closed-state display text for a SearchableSelect reads the
-      // selected item's own name (getDisplayText) -- "llama3.2" only
-      // renders here if `selectedModel` genuinely survived the Step M →
-      // Step 1 → Step M round trip, not merely that the field exists.
-      expect(await tauriPage.inputValue('[data-testid="agent-create-model-search-input"]')).toBe('llama3.2');
-      expect(await tauriPage.isVisible('[data-testid="agent-create-model-picker"]')).toBe(true);
+      // The target option is genuinely visible in the open list --
+      // not merely attached to the DOM -- before the screenshot captures
+      // it, same real-settled-state guarantee every other step's check
+      // provides.
+      expect(await tauriPage.isVisible('[data-testid="model-option-llama3.2"]')).toBe(true);
     },
   },
   {
     name: 'name-your-agent',
     caption: `Name your agent. Type a name, such as "Research Agent," then create it. You can rename it any time.`,
     action: async (tauriPage) => {
-      // Re-select the same model to advance Step M → Step 1 for real this
-      // time (the Back click in the previous step put us back on Step M
-      // specifically to prove the choice survived -- see that step's own
-      // comment). `agentName` is untouched by any of the Step M ↔ Step 1
-      // back-and-forth above, so the name field is still genuinely empty
-      // here before this step's own `fill()` below.
-      await tauriPage.focus('[data-testid="agent-create-model-search-input"]');
-      await tauriPage.waitForSelector('[data-testid="model-option-llama3.2"]', 10000);
+      // Click the option the previous step's screenshot showed open and
+      // visible in the list -- the real selection, once, not a round
+      // trip. Dispatched as `mousedown`, not clicked:
+      // SearchableSelect.svelte's row button only listens for
+      // `onmousedown` (so it can preventDefault() and dodge the input's
+      // own blur-before-click race) -- it has no `onclick` handler at
+      // all, so the plugin's bare `el.click()` would never reach
+      // `selectItem()`. This advances Step M → Step 1 (Name).
       await tauriPage.dispatchEvent('[data-testid="model-option-llama3.2"]', 'mousedown');
       await tauriPage.waitForSelector('[data-testid="agent-create-name-input"]', 10000);
       await tauriPage.fill('[data-testid="agent-create-name-input"]', 'Research Agent');
@@ -173,8 +187,9 @@ const steps: JourneyStep[] = [
     // caption. handleJustChat() (AgentCreateOverlay.svelte) just calls
     // onClose(); there is no further navigation. That lands back on the
     // Settings Agents tab the journey opened from, not a chat pane. This
-    // is a known, Reed-ruled-on navigation gap (not this journey's to
-    // fix) — the caption now describes the actual destination.
+    // is a known, pre-existing navigation gap, filed as issue #475 --
+    // not this journey's to fix — the caption now describes the actual
+    // destination.
     caption: `Choose "Just Start Chatting" to finish. Pane returns you to the Agents list, where your new agent now appears.`,
     action: async (tauriPage) => {
       await tauriPage.click('[data-testid="agent-create-seed-skip"]');
