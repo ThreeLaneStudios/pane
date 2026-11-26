@@ -180,6 +180,44 @@ const steps: JourneyStep[] = [
     },
     check: async (tauriPage) => {
       expect(await tauriPage.inputValue('[data-testid="agent-create-name-input"]')).toBe('Research Agent');
+      // Reed's audit (docs/audits/2026-11-26-scope-470-fonts.md §3): the
+      // name field being filled does NOT mean the Create button is ready
+      // to screenshot. AgentCreateOverlay.svelte's handleNameInput
+      // (:330-343) arms a 300ms debounce, then awaits a real
+      // checkNameCollision() IPC round-trip, before ctaDisabled (:269-271)
+      // settles back to false -- a screenshot taken inside that window
+      // (as the last run's did) shows a correctly-filled name next to a
+      // disabled, greyed Create button.
+      //
+      // First attempt here used a bare `waitForSelector(':not([disabled])')`
+      // -- that resolved (the `disabled` attribute genuinely was gone) but
+      // a real CI run still captured the button in its grey, disabled
+      // *paint* (rgb(28,28,32), exactly `--surface-2`, `.ag-btn--primary:disabled`'s
+      // background), not the enabled accent background. That's the SAME
+      // class of gap round 3 found on the Agents tab -- the DOM attribute
+      // flips one tick before WebKitGTK's own repaint lands, and
+      // `.ag-btn--primary`'s `transition: background 0.15s` (:1169 in this
+      // file) means there's a real, if short, window where `disabled` is
+      // false but the painted pixels still show the old (grey) state. A
+      // selector/attribute check alone cannot catch that -- it has to read
+      // the real, rendered style, same fix as step 1's
+      // activeTabContrastExpr above.
+      const ctaPaintedEnabledExpr = `(() => {
+        const btn = document.querySelector('[data-testid="agent-create-cta"]');
+        if (!btn || btn.disabled) return false;
+        const m = getComputedStyle(btn).backgroundColor.match(/rgba?\\(([^)]+)\\)/);
+        if (!m) return false;
+        const p = m[1].split(',').map(s => parseFloat(s.trim()));
+        // Disabled paints --surface-2 (rgb(28,28,32) dark theme). Enabled
+        // paints --accent (#00E4E4 = rgb(0,228,228)). Rather than assert
+        // an exact accent match (theme-dependent), assert the background
+        // has moved well away from the known disabled grey -- true the
+        // instant the repaint actually lands, false for however long the
+        // stale frame persists after the attribute flips.
+        return !(Math.abs(p[0] - 28) < 12 && Math.abs(p[1] - 28) < 12 && Math.abs(p[2] - 32) < 12);
+      })()`;
+      await tauriPage.waitForFunction(ctaPaintedEnabledExpr, 10000);
+      expect(await tauriPage.evaluate(ctaPaintedEnabledExpr)).toBe(true);
     },
   },
   {

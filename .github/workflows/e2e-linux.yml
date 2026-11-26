@@ -71,6 +71,23 @@ jobs:
           echo "PANE_TEST_ROOT=${RUNNER_TEMP}/pane-test-root" >> "$GITHUB_ENV"
           echo "PANE_TEST_DB=${RUNNER_TEMP}/pane-test-root/test.db" >> "$GITHUB_ENV"
 
+      # #470 (fonts PR): fonts-inter + fonts-noto-color-emoji added to this
+      # same apt-get install call (one apt-get update, no second network
+      # round trip) rather than a separate step -- matches how every other
+      # dependency here is already installed. fontconfig is almost
+      # certainly already present transitively via libwebkit2gtk-4.1-dev,
+      # but listed explicitly since the next step depends on `fc-cache`
+      # existing. Both fonts are standard Ubuntu `universe` packages,
+      # SIL Open Font License 1.1 (redistributable in CI, confirmed in
+      # docs/audits/2026-11-26-scope-470-fonts.md §2) -- no vendored
+      # binaries, no separate license step beyond this comment.
+      #
+      # Noto Color Emoji note: Reed traced the actual glyphs rendered by
+      # the six journey screenshots and found zero emoji on that path --
+      # every icon there is inline SVG. This install does not change any
+      # of those six images. It's installed anyway per Matt's instruction,
+      # because real emoji usage exists elsewhere in the app (outside this
+      # journey's path) -- see the same audit §2/§"Also covered".
       - name: Install Tauri 2.x Linux build dependencies
         run: |
           sudo apt-get update
@@ -82,7 +99,30 @@ jobs:
             pkg-config \
             curl \
             file \
-            xvfb
+            xvfb \
+            fonts-inter \
+            fonts-noto-color-emoji \
+            fontconfig
+
+      # #470 (fonts PR): installing the Inter package alone is not
+      # sufficient -- Reed's audit counted ~50 font-family rules across
+      # src/ (including src/app.css:188, the html,body root every
+      # unstyled element inherits) that hardcode
+      # `-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif`
+      # with no 'Inter' anywhere in the list -- CSS fallback can never
+      # reach a name that isn't written. e2e/ci-fonts/local.conf (new file,
+      # not under src/) intercepts the font lookup itself at the
+      # fontconfig layer, so those names resolve straight to Inter
+      # regardless of what the CSS stack lists. App code (app.css, every
+      # component) is unchanged. Must run before "Start Pane under Xvfb"
+      # (fontconfig is read at WebKitGTK render time, not build time) --
+      # placed here, right after the matching apt step, to keep all
+      # system-dependency setup together.
+      - name: Install CI fonts (Inter + emoji) and alias Apple/Microsoft stacks to Inter
+        run: |
+          sudo mkdir -p /etc/fonts
+          sudo cp e2e/ci-fonts/local.conf /etc/fonts/local.conf
+          fc-cache -f
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -191,13 +231,16 @@ jobs:
             exit 1
           fi
 
-      # Runs the EXISTING e2e/tests/smoke.spec.ts (no new test content).
-      # Both tests now run: the "Seed journey fixture" step above means a
-      # default ollama agent exists before Pane launches, so
-      # should_show_onboarding (notes.rs) resolves past onboarding and
-      # ".sidebar" actually renders -- "Pane sidebar is visible" no longer
-      # needs excluding via --grep.
-      - name: Run smoke e2e test (existing e2e/tests/smoke.spec.ts)
+      # Runs e2e/tests/smoke.spec.ts (no new content there). Both tests
+      # now run: the "Seed journey fixture" step above means a default
+      # ollama agent exists before Pane launches, so should_show_onboarding
+      # (notes.rs) resolves past onboarding and ".sidebar" actually renders
+      # -- "Pane sidebar is visible" no longer needs excluding via --grep.
+      #
+      # #470 (fonts PR): the `smoke` project's testMatch now also picks up
+      # e2e/tests/fonts.spec.ts (playwright.config.ts) -- the font-identity
+      # check runs here, via this same existing step, no new workflow step.
+      - name: Run smoke e2e test (existing e2e/tests/smoke.spec.ts + fonts.spec.ts)
         run: npx playwright test --config=e2e/playwright.config.ts --project=smoke
 
       # #470 PR 4: the first journey, against the SAME already-running Pane

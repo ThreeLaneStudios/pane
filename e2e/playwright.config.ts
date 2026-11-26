@@ -10,9 +10,16 @@ export default defineConfig({
     // tier*/ testDir, so untouched by the tier1/2/3 projects below) run via
     // `--project=smoke` from .github/workflows/e2e-linux.yml. No new test
     // content -- this only makes the pre-existing file discoverable.
+    //
+    // #470 (fonts PR): e2e/tests/fonts.spec.ts added to this same
+    // testMatch -- a CI/environment-correctness proof (is the font stack
+    // actually resolving to Inter?), same category as the existing
+    // "Pane app loads"/"Pane sidebar is visible" checks, not journey
+    // content. Runs via the same already-existing `--project=smoke` step
+    // in e2e-linux.yml -- no new workflow step needed.
     {
       name: 'smoke',
-      testMatch: /smoke\.spec\.ts$/,
+      testMatch: /(smoke|fonts)\.spec\.ts$/,
       timeout: 30000,
     },
     {
