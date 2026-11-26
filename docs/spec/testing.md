@@ -445,6 +445,10 @@ Journeys do not run on ordinary pull requests. A journey broken by an ordinary P
 4. **Select elements by `data-testid`.** Adding one to a core-behavioral file (for example `Onboarding.svelte` or `Settings.svelte`) needs a spec touch, as any change to those files does.
 5. **Paid providers are captured up to the setup screens only.** A journey never needs a real key.
 6. **A PR that changes a covered flow updates its journey in the same PR.**
+7. **A journey starts from Home and shows how to reach the feature.** Not from the middle of a flow — the first step's action is the click path a real reader would take to get there.
+8. **Each screenshot is taken after its action, so the result is visible.** A step with no way to check that is a step that shouldn't exist yet.
+9. **A journey ends on the outcome its title promises.** If the real destination differs from what the title implies, the journey captures the real one — it does not stop early to avoid saying so.
+10. **A fork in a flow becomes its own journey, linked from that step.** A journey follows one path start to finish; it does not branch mid-script to cover a second outcome.
 
 #### New features
 

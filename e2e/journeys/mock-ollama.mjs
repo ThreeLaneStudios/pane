@@ -20,8 +20,16 @@ const server = http.createServer((req, res) => {
   res.end();
 });
 
-// Ephemeral port (0) -- avoids any fixed-port collision risk on the
-// runner; the workflow reads the actual bound port off this one stdout line.
-server.listen(0, '127.0.0.1', () => {
+// #470 PR 474 round 2: Ollama's own real default (11434), not an
+// ephemeral port -- these screenshots become docs pages, and an
+// unusual-looking "http://127.0.0.1:<random port>" string in the
+// "Choose a provider" screenshot reads as test scaffolding, not a
+// real connected provider. The CI runner is a throwaway GitHub-hosted
+// box with nothing else listening on 11434, so the collision risk an
+// ephemeral port existed to avoid doesn't apply here. The workflow
+// step still reads the bound port off this one stdout line, unchanged.
+const MOCK_OLLAMA_PORT = 11434;
+
+server.listen(MOCK_OLLAMA_PORT, '127.0.0.1', () => {
   console.log(`MOCK_OLLAMA_PORT=${server.address().port}`);
 });

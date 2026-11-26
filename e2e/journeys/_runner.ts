@@ -3,11 +3,20 @@
 // A journey (the test file next to this one) is a plain-object array --
 // every step is a named record with its own caption right there on the
 // object literal. This file owns all the *mechanics*: running each step's
-// action, capturing+validating a screenshot via the EXISTING shared helper
-// (e2e/helpers/screenshot.ts, reused verbatim -- no second PNG decoder),
-// and writing the deterministic manifest.json a later docs-template PR
-// will render. Zero screenshot/manifest code lives in the journey file
-// itself -- see create-an-agent.journey.ts.
+// action, asserting its check, capturing+validating a screenshot via the
+// EXISTING shared helper (e2e/helpers/screenshot.ts, reused verbatim -- no
+// second PNG decoder), and writing the deterministic manifest.json a later
+// docs-template PR will render. Zero screenshot/manifest code lives in the
+// journey file itself -- see create-an-agent.journey.ts.
+//
+// Round 2 (PR 474): the order is now fixed as action -> check ->
+// screenshot, and a step with no check is a hard failure (see
+// `runJourney` below). Before this, a step's screenshot was taken
+// immediately after its action with nothing in between proving the
+// resulting screen actually matched the step's own caption -- which is
+// exactly how "Create an agent"'s first draft shipped a model-picker
+// screenshot captured before any model was selected. The check is the
+// thing that would have caught that, so it's no longer optional.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +37,16 @@ export type JourneyStep = {
   caption: string;
   /** Drives the app from the previous step's screen to this step's screen. */
   action: (tauriPage: TauriPage) => Promise<void>;
+  /**
+   * Asserts the screen `action` just produced actually matches what this
+   * step's `caption` is about to claim. Runs AFTER `action`, BEFORE the
+   * screenshot -- the runner's whole order is action -> check -> screenshot,
+   * so a check failure means the screenshot is never taken for a state that
+   * doesn't match its own caption. Required: a step with no check is a bug
+   * in the journey file, not an optional nicety (see `runJourney` below for
+   * the hard-failure enforcement).
+   */
+  check: (tauriPage: TauriPage) => Promise<void>;
 };
 
 export type ManifestStep = { index: number; name: string; caption: string; image: string };
@@ -66,6 +85,23 @@ export async function runJourney(journey: Journey, tauriPage: TauriPage): Promis
   for (const [i, step] of journey.steps.entries()) {
     await test.step(step.name, async () => {
       await step.action(tauriPage);
+
+      // Hard failure, not a warning/skip: the runtime check backs up the
+      // TypeScript `check` field being non-optional. A step without one is
+      // exactly the bug that let step 2 of this journey's first draft get
+      // screenshotted before its own action had actually finished (the
+      // model picker, captured with nothing selected yet) -- the check is
+      // what proves the screen matches the caption before a single PNG
+      // byte is written.
+      if (typeof step.check !== 'function') {
+        throw new Error(
+          `journey step "${step.name}" has no check -- every step must assert the ` +
+          `screen "action" just produced before its screenshot is taken (§25.13 ` +
+          `"each screenshot is taken after its action, so the result is visible").`
+        );
+      }
+      await step.check(tauriPage);
+
       const image = `${String(i + 1).padStart(2, '0')}-${step.name}.png`;
       await captureAndValidateScreenshot(tauriPage, path.join(outDir, image));
       manifestSteps.push({ index: i + 1, name: step.name, caption: step.caption, image });

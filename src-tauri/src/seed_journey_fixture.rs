@@ -125,9 +125,14 @@ mod tests {
         // PANE_TEST_ROOT/.pane/system/{workspace_path}/, both for free, via
         // the same code path the frontend's AgentCreateOverlay calls.
         let db_state = app.state::<DbState>();
+        // #470 PR 474 round 2: a natural name, not "Test"/"Fixture"/"Seed" --
+        // these screenshots become docs pages, and a test-shaped agent name
+        // sitting next to the journey's own freshly-created "Research Agent"
+        // undermines the page. "Scout" reads like a name a real user would
+        // actually give a default assistant.
         let agent = create_local_agent(
             CreateLocalAgentRequest {
-                name: "Journey Fixture Agent".to_string(),
+                name: "Scout".to_string(),
                 model: Some("llama3.2".to_string()), // CI-ALLOW: hardcoded-model
                 description: None,
                 runtime_type: "ollama".to_string(),

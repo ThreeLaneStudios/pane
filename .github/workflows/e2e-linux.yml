@@ -132,9 +132,14 @@ jobs:
       # before Pane launches -- order matters so the seed step has the
       # mock's real bound port to write, and so the one unconditional
       # startup dial (lib.rs's eager ModelRegistry populate) has
-      # something listening from the first launch instant. Ephemeral port
-      # (`:0` inside mock-ollama.mjs) -- read off the one stdout line it
-      # prints, same wait-loop idiom as "Start Pane under Xvfb" below.
+      # something listening from the first launch instant.
+      # #470 PR 474 round 2: fixed port 11434 (Ollama's own real default)
+      # inside mock-ollama.mjs now, not an ephemeral `:0` -- so the
+      # "Choose a provider" screenshot shows a real-looking
+      # `http://127.0.0.1:11434` instead of an arbitrary port. Still read
+      # off the one stdout line mock-ollama.mjs prints, same wait-loop
+      # idiom as "Start Pane under Xvfb" below -- this step's own shell
+      # logic needs no change for that.
       - name: Start mock Ollama endpoint
         run: |
           node e2e/journeys/mock-ollama.mjs > /tmp/mock-ollama.log 2>&1 &
@@ -197,9 +202,10 @@ jobs:
 
       # #470 PR 4: the first journey, against the SAME already-running Pane
       # process the smoke test above just used. e2e/journeys/create-an-
-      # agent.journey.ts writes 5 step PNGs + manifest.json to
+      # agent.journey.ts writes one PNG per step + manifest.json to
       # e2e/journeys-output/create-an-agent/ (the "Upload journey artifact"
-      # step below uploads that whole directory as one artifact).
+      # step below uploads that whole directory as one artifact). Round 2
+      # (PR 474) added an opening step -- 6 steps/PNGs now, not 5.
       - name: Run "Create an agent" journey
         run: npx playwright test --config=e2e/playwright.config.ts --project=journeys
 
@@ -249,12 +255,12 @@ jobs:
           # go green before PR #472's fix.
           if-no-files-found: error
 
-      # #470 PR 4: one artifact holding all five step PNGs plus
+      # #470 PR 4: one artifact holding every step's PNG plus
       # manifest.json -- the entire e2e/journeys-output/create-an-agent/
       # directory, matching the per-journey-subdirectory layout the
       # runner (_runner.ts) writes so a later second journey doesn't
       # collide with this one's files. error (not warn): manifest.json is
-      # only ever written after all five steps succeed (_runner.ts), and
+      # only ever written after every step succeeds (_runner.ts), and
       # each step's own screenshot is already asserted to exist by
       # captureAndValidateScreenshot -- a missing artifact here means the
       # job should already have failed loudly before reaching this step.
