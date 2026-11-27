@@ -33,17 +33,19 @@
 //      (see render-prose.ts's own header comment) -- rendered via
 //      `renderInlineProse`, which converts that one convention to
 //      `<strong>` and HTML-escapes everything else.
-//   2. There is no hand-authored per-step heading in the manifest (only
-//      `name`, kebab-case, and `caption`, a full sentence) -- each step's
-//      `<h2>` is "`{index}. {Title Case of name}`", matching the numbered
-//      `<h2>` convention `onboard-openrouter/+page.svelte` already uses,
-//      built from `titleCaseFromKebab` (mechanical, no invented prose).
-//      The `<div class="meta">` line similarly can't borrow the site's
+//   2. Each step's `<h2>` is "`{index}. {step.title}`", matching the
+//      numbered `<h2>` convention `onboard-openrouter/+page.svelte`
+//      already uses. PR 483 round 2 added a hand-authored `title` to
+//      every step (§25.13 rule 3, extended) -- before that, the manifest
+//      carried only `name` (kebab-case) and `caption` (a full sentence,
+//      too long for a heading), so this file mechanically Title Cased
+//      `name` as a stand-in heading (`titleCaseFromKebab`, now deleted --
+//      no caller left once a real hand-written heading existed). The
+//      `<div class="meta">` line similarly can't borrow the site's
 //      hand-picked "About N min" estimate (nothing in the manifest times
 //      a read) -- it reports the mechanically true "Tutorial · N steps"
 //      instead, derived from `manifest.steps.length`.
 import { escapeHtmlAttr, escapeHtmlText, renderInlineProse } from './render-prose.ts';
-import { titleCaseFromKebab } from './kebab-title.ts';
 import type { JourneyManifest } from '../journeys/_runner.ts';
 
 /**
@@ -106,12 +108,12 @@ export function renderPageSvelte(manifest: JourneyManifest, slug: string, knownJ
   }
 
   for (const step of manifest.steps) {
-    const heading = `${step.index}. ${titleCaseFromKebab(step.name)}`;
+    const heading = `${step.index}. ${step.title}`;
     lines.push(`  <h2>${escapeHtmlText(heading)}</h2>`);
     lines.push(`  <img`);
     lines.push(`    class="d-shot"`);
     lines.push(`    src="{base}/${step.image}"`);
-    lines.push(`    alt="${escapeHtmlAttr(titleCaseFromKebab(step.name))}"`);
+    lines.push(`    alt="${escapeHtmlAttr(step.title)}"`);
     lines.push(`    loading="lazy"`);
     lines.push(`  />`);
     lines.push(`  <div class="d-call">`);

@@ -442,7 +442,7 @@ Ordinary pull requests — ones that don't touch `e2e/**` — still don't trigge
 
 1. **One journey per how-to.** Name it for what the user is trying to do.
 2. **Every step has an action, a caption, and a screenshot.** Captions live in the journey file, next to the step they describe.
-3. **Captions are written for the end user**, in plain language. Matt approved the captions of the first journey, "Create an agent" (`e2e/journeys/create-an-agent.journey.ts`) — that journey is the reference for voice. For every journey after it, whoever writes the journey writes its captions: one or two plain sentences per step, saying what the user does and what happens, matching that reference.
+3. **Captions are written for the end user**, in plain language. Matt approved the captions of the first journey, "Create an agent" (`e2e/journeys/create-an-agent.journey.ts`) — that journey is the reference for voice. For every journey after it, whoever writes the journey writes its captions: one or two plain sentences per step, saying what the user does and what happens, matching that reference. **Each step also has a short title**, hand-written the same way — a few words, not a sentence, used as that step's heading on the generated docs page.
 4. **Select elements by `data-testid`.** Adding one to a core-behavioral file (for example `Onboarding.svelte` or `Settings.svelte`) needs a spec touch, as any change to those files does.
 5. **Paid providers are captured up to the setup screens only.** A journey never needs a real key.
 6. **A PR that changes a covered flow updates its journey in the same PR.**

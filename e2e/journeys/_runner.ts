@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from '../fixtures';
-import { captureAndValidateScreenshot } from '../helpers/screenshot';
+import { captureAndValidateScreenshot, type ScreenshotCropOptions } from '../helpers/screenshot';
 import type { TauriPage } from '@srsholmes/tauri-playwright';
 
 // Resolved from import.meta.url, not __dirname -- same reason
@@ -46,6 +46,16 @@ export type JourneyFork = { journey: string; label: string };
 export type JourneyStep = {
   /** kebab-case, used in the screenshot filename and the manifest's "name" field. */
   name: string;
+  /**
+   * Hand-authored, short step heading (§25.13 rule 3, extended PR 483
+   * round 2) -- the generated docs page's `<h2>` for this step. Written
+   * the same way `caption` is: one short phrase, not derived from `name`
+   * (kebab-case, already doing double duty as the screenshot-filename
+   * prefix) or mechanically split out of `caption` (a full sentence,
+   * written separately so rewording one doesn't silently reword the
+   * other).
+   */
+  title: string;
   /** End-user-facing prose, verbatim from whoever wrote the journey (§25.13 rule 3). */
   caption: string;
   /** Drives the app from the previous step's screen to this step's screen. */
@@ -60,6 +70,15 @@ export type JourneyStep = {
    * the hard-failure enforcement).
    */
   check: (tauriPage: TauriPage) => Promise<void>;
+  /**
+   * Optional (PR 483 round 2) -- crops this step's screenshot down to one
+   * element's real bounding box, padded (see
+   * `e2e/helpers/screenshot.ts`'s `ScreenshotCropOptions`). Omitted
+   * entirely for a step that should stay full-screen -- "Create an
+   * agent"'s opening and closing steps, both of which show the whole app
+   * window rather than a small dialog in it, set no `crop`.
+   */
+  crop?: ScreenshotCropOptions;
   /** Optional -- see `JourneyFork` above. */
   fork?: JourneyFork;
 };
@@ -67,6 +86,8 @@ export type JourneyStep = {
 export type ManifestStep = {
   index: number;
   name: string;
+  /** Carried from the step's own `title` above -- the docs page's `<h2>`. */
+  title: string;
   caption: string;
   image: string;
   /** Carried through only when the step that produced it set one. */
@@ -150,10 +171,15 @@ export async function runJourney(journey: Journey, tauriPage: TauriPage): Promis
       await step.check(tauriPage);
 
       const image = `${String(i + 1).padStart(2, '0')}-${step.name}.png`;
-      await captureAndValidateScreenshot(tauriPage, path.join(outDir, image));
+      // `step.crop` is undefined (not an empty object) for the steps that
+      // stay full-screen, so `captureAndValidateScreenshot`'s own `if
+      // (crop)` branch is skipped for those exactly as before this field
+      // existed -- no behavior change for a step that doesn't opt in.
+      await captureAndValidateScreenshot(tauriPage, path.join(outDir, image), {}, step.crop);
       manifestSteps.push({
         index: i + 1,
         name: step.name,
+        title: step.title,
         caption: step.caption,
         image,
         // Carried through only when present -- same optional-field shape

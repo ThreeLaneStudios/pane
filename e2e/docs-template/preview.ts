@@ -19,7 +19,6 @@
 // (rendered through the site's actual layout, in the later publish PR)
 // is for.
 import { escapeHtmlAttr, escapeHtmlText, renderInlineProse } from './render-prose.ts';
-import { titleCaseFromKebab } from './kebab-title.ts';
 import type { JourneyManifest } from '../journeys/_runner.ts';
 
 const PREVIEW_CSS = `
@@ -89,11 +88,11 @@ export function renderPreviewHtml(manifest: JourneyManifest, imageDir: string, k
 
   const stepsHtml = manifest.steps
     .map((step) => {
-      const heading = `${step.index}. ${titleCaseFromKebab(step.name)}`;
+      const heading = `${step.index}. ${step.title}`;
       const forkLine = step.fork !== undefined ? `\n${renderForkLineHtml(step.fork, knownJourneys)}` : '';
       return [
         `    <h2>${escapeHtmlText(heading)}</h2>`,
-        `    <img class="d-shot" src="${imageDir}/${encodeURIComponent(step.image)}" alt="${escapeHtmlAttr(titleCaseFromKebab(step.name))}" loading="lazy" />`,
+        `    <img class="d-shot" src="${imageDir}/${encodeURIComponent(step.image)}" alt="${escapeHtmlAttr(step.title)}" loading="lazy" />`,
         `    <div class="d-call">`,
         `      <p>${renderInlineProse(step.caption)}</p>${forkLine}`,
         `    </div>`,

@@ -15,6 +15,16 @@
 // §25.13 rule 3 -- this journey is the reference for voice for every
 // journey after it.
 //
+// PR 483 round 2: every step gains a hand-written `title` (§25.13 rule 3,
+// extended) -- the docs page's <h2> heading, which was previously
+// mechanically derived from the step's kebab-case `name` and repeated the
+// caption's own first sentence. Each `title` below is Matt's exact text,
+// and is the FIRST SENTENCE of what used to be the whole caption; the
+// REST of that sentence is the step's `caption`, unchanged except where
+// noted inline (only 'choose-model' reworded, see that step's own
+// comment). Curly quotes throughout, matching the captions' own existing
+// convention.
+//
 // Entry point traced against src/lib/components/AgentCreateOverlay.svelte
 // (module header comment, "voluntary" path) and Settings.svelte's
 // `openCreateFlow()` (forcedCreate=false): Settings → Agents tab → "+ New
@@ -84,6 +94,23 @@ import { runJourney, type JourneyStep, type Journey } from './_runner';
 // above the step list by the eventual docs template (separate PR).
 const PREREQUISITE = `**Before you start:** connect a provider in Settings › AI.`;
 
+// PR 483 round 2: steps 'choose-provider' through 'agent-created' are a
+// small ~540px-wide dialog (`.agent-create-center`, AgentCreateOverlay.
+// svelte) centered in the full app window (`.agent-create-overlay`,
+// `position: fixed; inset: 0`) -- the screenshot for each is otherwise
+// mostly empty frame around a small card. One shared crop option (see
+// `e2e/helpers/screenshot.ts`'s `ScreenshotCropOptions`), reused across
+// all four of those steps since it's the same dialog on screen for each
+// -- not hardcoded per step, and not applied to 'open-agents-settings' or
+// 'just-start-chatting' below, both of which show the whole app window
+// (Settings, then Home) and stay full-screen. `.agent-create-center` is
+// the real element already in the DOM (not a guessed rectangle) -- grepped
+// against the rest of src/ (`grep -rn "agent-create-center" src/`) to
+// confirm the class is unique to this one element. 24px padding matches
+// the dialog's own horizontal padding (`.agent-create-center { padding:
+// 40px 24px; }`) rather than cutting flush to its edges.
+const DIALOG_CROP = { selector: '.agent-create-center', paddingPx: 24 };
+
 const steps: JourneyStep[] = [
   {
     // New in round 2 (§25.13 rule 7, PR 474): a journey starts from Home
@@ -91,7 +118,11 @@ const steps: JourneyStep[] = [
     // started with the create-agent overlay already open, skipping the
     // path a reader actually has to walk.
     name: 'open-agents-settings',
-    caption: `Open Settings. In the Agents tab, click "+ New agent" to create one.`,
+    // PR 483 round 2: first sentence is the step's hand-written `title`
+    // (the docs page's <h2>); the rest is `caption`. Matt's exact text —
+    // see this PR's own description for the full old/new wording diff.
+    title: `Open Settings › Agents.`,
+    caption: `In Settings, open the Agents tab and click “+ New agent.”`,
     action: async (tauriPage) => {
       await tauriPage.getByTitle('Settings').click();
       await tauriPage.getByText('Agents', { exact: true }).click();
@@ -111,7 +142,9 @@ const steps: JourneyStep[] = [
   },
   {
     name: 'choose-provider',
-    caption: `Choose a provider. Pick which connected provider this agent runs on. You can't change it later, so choose the one you want this agent to live on.`,
+    title: `Choose a provider.`,
+    caption: `Pick which connected provider this agent runs on. You can’t change it later, so choose the one you want this agent to live on.`,
+    crop: DIALOG_CROP,
     action: async (tauriPage) => {
       // The only path to the voluntary create flow (forcedCreate=false),
       // which opens the overlay straight onto Step R, "Choose a provider".
@@ -127,7 +160,14 @@ const steps: JourneyStep[] = [
   },
   {
     name: 'choose-model',
-    caption: `Choose a model. Search for a model, then click it in the list to select it. You can change the model later in the agent's settings.`,
+    title: `Choose a model.`,
+    // PR 483 round 2: wording changed from "...click it in the list to
+    // select it" -- the final clause was redundant with "click it", and
+    // this step's own action (see below) deliberately does NOT select
+    // the option yet, so "to select it" overclaimed what the screenshot
+    // actually shows. Matt's exact replacement text.
+    caption: `Search for a model, then click it in the list. You can change the model later in the agent’s settings.`,
+    crop: DIALOG_CROP,
     action: async (tauriPage) => {
       // Picking the provider card advances Step R → Step M and fires
       // fetch_available_models (→ GET /api/tags on the mock Ollama
@@ -164,7 +204,9 @@ const steps: JourneyStep[] = [
   },
   {
     name: 'name-your-agent',
-    caption: `Name your agent. Type a name, such as "Research Agent," then create it. You can rename it any time.`,
+    title: `Name your agent.`,
+    caption: `Type a name, such as “Research Agent,” then create it. You can rename it any time.`,
+    crop: DIALOG_CROP,
     action: async (tauriPage) => {
       // Click the option the previous step's screenshot showed open and
       // visible in the list -- the real selection, once, not a round
@@ -193,7 +235,9 @@ const steps: JourneyStep[] = [
   },
   {
     name: 'agent-created',
-    caption: `Your agent is ready. Pane confirms the agent is created. From here you can upload documents, answer a few questions to shape it, or start chatting right away.`,
+    title: `Your agent is ready.`,
+    caption: `Pane confirms the agent is created. From here you can upload documents, answer a few questions to shape it, or start chatting right away.`,
+    crop: DIALOG_CROP,
     action: async (tauriPage) => {
       // ADR-0059 D4: this click is the transaction boundary — the real
       // create_local_agent command runs here. It advances Step 1 → Step 2
@@ -227,6 +271,7 @@ const steps: JourneyStep[] = [
     // use). This fixture seeds zero sessions before this step, so the
     // session Home opens on here is necessarily the one just created for
     // the new agent.
+    title: `Start chatting.`,
     caption: `Choose “Just Start Chatting.” Pane opens Home with a new chat for your agent, ready for your first message.`,
     action: async (tauriPage) => {
       await tauriPage.click('[data-testid="agent-create-seed-skip"]');
