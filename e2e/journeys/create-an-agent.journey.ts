@@ -44,8 +44,73 @@
 // first (the actual selection), then fills the name field, same as any
 // other step whose action continues from where the previous one left the
 // screen.
+//
+// Round 4 (PR 2 of #470's "journey hardening" group, §25.13 rule 8's
+// amendment): #476 ("wrong progress dot lit") was closed not-a-bug --
+// Reed proved `activeStepIdx` (AgentCreateOverlay.svelte:282-291) is
+// correctly called as a function at its one call site
+// (AgentCreateOverlay.svelte:665, `class:active={i === activeStepIdx()}`)
+// and that `$derived.by` would crash every other call site that still
+// calls it with `()`. The real defect was this journey, not the app:
+// `.agent-create-step-dot` (AgentCreateOverlay.svelte:1065-1071) carries
+// `transition: background 0.2s`, so the dot that just became active is
+// still mid-fade from `--border-strong` to `--accent` in the same window
+// a screenshot can land in -- exactly the class of gap rule 8's
+// amendment names. None of the four overlay steps ('choose-provider',
+// 'choose-model', 'name-your-agent', 'agent-created') had ANY check on
+// the dots at all before this round; each now polls the real painted
+// background of its own dot before the screenshot, same mechanism as
+// the opening step's `activeTabContrastExpr` below (alpha-of-target vs.
+// alpha-of-a-known-inactive-sibling, via a shared `dotPaintedActiveExpr`
+// so the comparison logic exists in exactly one place in this file).
+// Dot indices verified against the real voluntary-path markup
+// (AgentCreateOverlay.svelte:282-291's `activeStepIdx`, voluntary
+// `stepCount = 4`): provider=0 (1st dot), model=1 (2nd), name=2 (3rd),
+// seeding/agent-created=3 (4th) -- the dots render via
+// `{#each Array(stepCount) as _, i}` in that same index order, so
+// markup order and step order agree here (confirmed by reading the
+// template, not assumed).
+//
+// The other checks in steps 'choose-provider' and 'choose-model'
+// (`isVisible` on the provider card / model option) are left alone: both
+// elements are brought into the DOM by a plain Svelte `{#each}`/`{#if}`
+// with no Svelte `transition:` directive and no CSS opacity/visibility
+// transition on first appearance (grepped `AgentCreateOverlay.svelte`
+// and `SearchableSelect.svelte` for `transition:` -- every hit is a CSS
+// property transition on background/border/color for hover or
+// active-state restyling, not on becoming visible), so there is no
+// mid-transition frame for an `isVisible` check to miss.
 import { test, expect } from '../fixtures';
 import { runJourney, type JourneyStep, type Journey } from './_runner';
+
+// Shared by every per-step progress-dot check below (§25.13 rule 8's
+// amendment): `.agent-create-step-dot` (AgentCreateOverlay.svelte) paints
+// `background: var(--border-strong)` inactive and `var(--accent)` active,
+// with a 0.2s CSS transition between the two -- the class flips the
+// instant `activeStepIdx()` changes, but the painted pixels can lag it by
+// up to 200ms, the same gap the opening step's `activeTabContrastExpr`
+// (below) already catches for the Agents/General tab buttons. One
+// function, not four copies: every overlay step calls this with its own
+// dot index rather than re-deriving the alpha-matching logic (One
+// Function Per Operation). `targetIdx` is compared against its very next
+// neighbour (wrapping), which is always a different dot and therefore
+// always the inactive one, since only one dot is ever active at a time.
+function dotPaintedActiveExpr(targetIdx: number): string {
+  return `(() => {
+    function alphaOf(el) {
+      const m = getComputedStyle(el).backgroundColor.match(/rgba?\\(([^)]+)\\)/);
+      if (!m) return 0;
+      const parts = m[1].split(',').map(s => parseFloat(s.trim()));
+      return parts.length === 4 ? parts[3] : 1;
+    }
+    const dots = Array.from(document.querySelectorAll('.agent-create-step-dot'));
+    const target = dots[${targetIdx}];
+    if (!target || dots.length < 2) return false;
+    const sibling = dots[(${targetIdx} + 1) % dots.length];
+    if (!sibling) return false;
+    return (alphaOf(target) - alphaOf(sibling)) > 0.05;
+  })()`;
+}
 
 // Page-level front matter — NOT a step: no action, no screenshot. Rendered
 // above the step list by the eventual docs template (separate PR).
@@ -123,6 +188,12 @@ const steps: JourneyStep[] = [
     },
     check: async (tauriPage) => {
       expect(await tauriPage.isVisible('[data-runtime="ollama"]')).toBe(true);
+      // §25.13 rule 8 amendment: the voluntary path's 1st dot (index 0,
+      // AgentCreateOverlay.svelte's `activeStepIdx`) must be genuinely
+      // painted active before this screenshot, not just class-flipped.
+      const dot0Expr = dotPaintedActiveExpr(0);
+      await tauriPage.waitForFunction(dot0Expr, 10000);
+      expect(await tauriPage.evaluate(dot0Expr)).toBe(true);
     },
   },
   {
@@ -160,6 +231,10 @@ const steps: JourneyStep[] = [
       // it, same real-settled-state guarantee every other step's check
       // provides.
       expect(await tauriPage.isVisible('[data-testid="model-option-llama3.2"]')).toBe(true);
+      // §25.13 rule 8 amendment: 2nd dot (index 1) painted active.
+      const dot1Expr = dotPaintedActiveExpr(1);
+      await tauriPage.waitForFunction(dot1Expr, 10000);
+      expect(await tauriPage.evaluate(dot1Expr)).toBe(true);
     },
   },
   {
@@ -218,6 +293,15 @@ const steps: JourneyStep[] = [
       })()`;
       await tauriPage.waitForFunction(ctaPaintedEnabledExpr, 10000);
       expect(await tauriPage.evaluate(ctaPaintedEnabledExpr)).toBe(true);
+
+      // §25.13 rule 8 amendment: 3rd dot (index 2) painted active. This
+      // is separate from the CTA check above -- the step → dot transition
+      // starts the instant the previous step's action advances
+      // `step = 'name'`, which is a different 0.2s window than the CTA's
+      // own enable transition, so one passing does not imply the other.
+      const dot2Expr = dotPaintedActiveExpr(2);
+      await tauriPage.waitForFunction(dot2Expr, 10000);
+      expect(await tauriPage.evaluate(dot2Expr)).toBe(true);
     },
   },
   {
@@ -237,6 +321,14 @@ const steps: JourneyStep[] = [
       // name typed in the previous step -- proves this is a real
       // create_local_agent result, not a stale/default screen.
       expect(await tauriPage.getByText('Research Agent', { exact: false }).isVisible()).toBe(true);
+      // §25.13 rule 8 amendment: 4th dot (index 3) painted active. This
+      // is the known case from #476 -- the prior journey had no dot
+      // check here at all, so a screenshot taken while dot 3 (name's
+      // dot) was still fading out and dot 4 was still fading in could
+      // pass every other assertion above and still show the wrong dot.
+      const dot3Expr = dotPaintedActiveExpr(3);
+      await tauriPage.waitForFunction(dot3Expr, 10000);
+      expect(await tauriPage.evaluate(dot3Expr)).toBe(true);
     },
   },
   {
