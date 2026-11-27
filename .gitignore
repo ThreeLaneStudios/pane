@@ -10,6 +10,11 @@ target/
 e2e/journeys-output/
 e2e/test-results/
 
+# #470 docs-template PR: generated +page.svelte / preview.html / copied
+# screenshots -- produced by e2e/docs-template/generate.ts from the above,
+# uploaded as a CI artifact, never committed.
+e2e/docs-template-output/
+
 # Pane runtime workspace artifacts (sync state created when running Pane locally
 # against the gateway). NOT source. Has been accidentally committed twice in two
 # days — PR #1315 and PR #1330. See #1317 (CI dirty-tree guard) for mechanical

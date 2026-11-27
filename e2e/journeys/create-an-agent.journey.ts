@@ -246,6 +246,14 @@ const steps: JourneyStep[] = [
 
 const journey: Journey = {
   name: 'create-an-agent',
+  // #470 docs-template PR: hand-authored page title, same pattern as the
+  // captions above -- not derived from `name` (which is already doing
+  // double duty as the output directory and screenshot-filename prefix)
+  // and not derived from the slug this page eventually publishes at
+  // (`docs/creating-an-agent`, Matt's ruling on #470 -- the generated page
+  // takes over the existing hand-written one at that address once a later
+  // PR publishes it). Matt's title for this journey: "Create an agent".
+  title: 'Create an agent',
   prerequisite: PREREQUISITE,
   steps,
 };

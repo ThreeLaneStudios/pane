@@ -30,6 +30,19 @@ import type { TauriPage } from '@srsholmes/tauri-playwright';
 // from.
 const JOURNEYS_DIR = path.dirname(fileURLToPath(import.meta.url));
 
+// #470 docs-template PR: a fork in a flow becomes its own journey, linked
+// from the step where it branches (§25.13 rule 10 -- authoring policy; this
+// is the manifest mechanism that backs it). `journey` is the target
+// journey's `name` (the kebab-case identifier every journey already has),
+// not a URL -- the renderer, not the manifest, decides at render time
+// whether that journey currently resolves to a real page. `label` is the
+// user-facing link text, hand-authored the same way a caption is -- not
+// derived from `journey` mechanically, for the same reason `title` below
+// isn't derived from a journey's `name` either. Not exercised by
+// create-an-agent's own six steps (none of them forks); carried through
+// only when a step actually sets it.
+export type JourneyFork = { journey: string; label: string };
+
 export type JourneyStep = {
   /** kebab-case, used in the screenshot filename and the manifest's "name" field. */
   name: string;
@@ -47,13 +60,47 @@ export type JourneyStep = {
    * the hard-failure enforcement).
    */
   check: (tauriPage: TauriPage) => Promise<void>;
+  /** Optional -- see `JourneyFork` above. */
+  fork?: JourneyFork;
 };
 
-export type ManifestStep = { index: number; name: string; caption: string; image: string };
+export type ManifestStep = {
+  index: number;
+  name: string;
+  caption: string;
+  image: string;
+  /** Carried through only when the step that produced it set one. */
+  fork?: JourneyFork;
+};
+
+/**
+ * The full shape written to manifest.json -- named so the docs-template PR
+ * can `import type` it instead of re-declaring the shape it reads (same
+ * "find it, don't duplicate" rule the title field itself follows below).
+ */
+export type JourneyManifest = {
+  journey: string;
+  /** Hand-authored, human-facing page title -- see `Journey.title` below. */
+  title: string;
+  prerequisite?: string;
+  steps: ManifestStep[];
+};
 
 export type Journey = {
   /** Used for the output directory and the manifest's "journey" field. */
   name: string;
+  /**
+   * Hand-authored, human-facing page title (§25.13 rule 3's pattern one
+   * level up from captions -- a plain string literal on the journey
+   * object, reviewed the same way Matt already reviewed this journey's
+   * captions). Not derived from `name` (kebab-case, doing double duty
+   * already as the output directory and screenshot-filename prefix) or
+   * from the slug a title eventually publishes at -- the existing site's
+   * real titles aren't a mechanical transform of either, so derivation
+   * would produce something subtly wrong with no way to fix it short of
+   * renaming the journey.
+   */
+  title: string;
   /**
    * Page-level front matter, NOT a step -- no action, no screenshot. Renders
    * above the step list in the eventual docs template (e.g. "Before you
@@ -104,12 +151,26 @@ export async function runJourney(journey: Journey, tauriPage: TauriPage): Promis
 
       const image = `${String(i + 1).padStart(2, '0')}-${step.name}.png`;
       await captureAndValidateScreenshot(tauriPage, path.join(outDir, image));
-      manifestSteps.push({ index: i + 1, name: step.name, caption: step.caption, image });
+      manifestSteps.push({
+        index: i + 1,
+        name: step.name,
+        caption: step.caption,
+        image,
+        // Carried through only when present -- same optional-field shape
+        // `prerequisite` already uses below, so a journey with no forks
+        // writes no `fork` keys at all, not `fork: undefined` ones.
+        ...(step.fork !== undefined ? { fork: step.fork } : {}),
+      });
     });
   }
 
-  const manifest = {
+  // #470 docs-template PR: `title` added between `journey` and
+  // `prerequisite` -- same stable, hand-written key order every run, so
+  // adding the field doesn't disturb the "no timestamp, stable key order"
+  // determinism guarantee this comment block already describes above.
+  const manifest: JourneyManifest = {
     journey: journey.name,
+    title: journey.title,
     ...(journey.prerequisite !== undefined ? { prerequisite: journey.prerequisite } : {}),
     steps: manifestSteps,
   };
