@@ -37,20 +37,21 @@
 //     getting-started/+page.svelte:97-104) or plain "(coming soon)" text
 //     if the target isn't a known page yet. No `.d-fork` class -- it
 //     doesn't exist anywhere on the site.
-//   - NO `<style>` block. `.d-shot` (used by every single docs page for
-//     its step screenshots) has no global CSS anywhere in
+//   - ONE `<style>` block: `.d-shot` (used by every docs page for its
+//     step screenshots) has no global CSS anywhere in
 //     `src/lib/styles/docs.css` -- its only CSS source on the entire
 //     site is an identical scoped `<style>` block duplicated at the
-//     bottom of all 18 existing pages (confirmed, md5-identical across
-//     17 of them). Per Matt's explicit "no `<style>` block" ruling, this
-//     generated page does NOT carry that block either, which means ITS
-//     `.d-shot` images render with no border/radius/spacing until either
-//     (a) that ruling is amended to allow replicating the already-
-//     universal block, or (b) a separate `paneapp-ai`-side PR promotes
-//     `.d-shot` into `docs.css` (global, dedupes 18 copies, zero visual
-//     change). Flagged in this PR's description -- not resolved here,
-//     per the instruction to report a real site CSS gap rather than
-//     invent around it.
+//     bottom of 17 of the 18 existing pages (the 18th,
+//     system-files-creation, carries the same block plus extra unrelated
+//     rules). Round 2 flagged this gap for Matt rather than inventing
+//     around it; his ruling: the generated page carries that SAME block,
+//     byte for byte -- not new CSS, a verbatim copy of what every
+//     sibling page already ships. `D_SHOT_STYLE_BLOCK` below is copied
+//     character-for-character from
+//     install-pane/+page.svelte:130-139 (verified by diff against a
+//     fresh clone of paneapp-ai@release -- see this PR's description for
+//     the md5). No other class, no other rule -- this is the one and
+//     only `<style>` block this generator emits.
 //
 // This PR generates for Matt's ruling: slug `docs/creating-an-agent`,
 // images at `static/assets/tutorials/creating-an-agent` -- publishing
@@ -60,6 +61,28 @@
 // that repo.
 import { escapeHtmlAttr, escapeHtmlText, renderInlineProse, stripTrailingPeriod } from './render-prose.ts';
 import type { JourneyManifest } from '../journeys/_runner.ts';
+
+/**
+ * Copied character-for-character from
+ * install-pane/+page.svelte:130-139 (paneapp-ai@release, commit
+ * a2ae2c5) -- the SAME scoped block 17 of the other 18 docs pages carry
+ * (the 18th, system-files-creation, has this block plus extra unrelated
+ * rules). Per Matt's ruling: this is the one `<style>` block the
+ * generator ships, and it must stay byte-identical to its source -- do
+ * not edit this constant without re-diffing against the live page.
+ */
+const D_SHOT_STYLE_BLOCK = [
+  `<style>`,
+  `  .d-shot {`,
+  `    display: block;`,
+  `    width: 100%;`,
+  `    height: auto;`,
+  `    margin: 0 0 18px;`,
+  `    border-radius: var(--radius-card);`,
+  `    border: 1px solid var(--bg-border);`,
+  `  }`,
+  `</style>`,
+].join('\n');
 
 /**
  * Renders one step's `fork` field (§25.13 rule 10's manifest mechanism)
@@ -142,6 +165,8 @@ export function renderPageSvelte(manifest: JourneyManifest, slug: string, knownJ
 
   lines.push(`  <DocsPrevNext pathname={page.url.pathname} />`);
   lines.push(`</article>`);
+  lines.push('');
+  lines.push(D_SHOT_STYLE_BLOCK);
   lines.push('');
 
   return lines.join('\n');

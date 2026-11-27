@@ -311,50 +311,70 @@ jobs:
         run: kill "$(cat /tmp/mock-ollama.pid)" 2>/dev/null || true
 
       # ---------------------------------------------------------------
-      # #470 PR 1 (publish1): build the REAL paneapp-ai site with the
-      # generated page in place and screenshot the actual rendered
-      # result. This is the proof that replaces the old standalone-HTML
-      # preview.html (removed this PR) -- Matt's ruling on #470: a
-      # self-styled approximation isn't good enough proof that the page
-      # looks right on the live site; only the live site's own build,
-      # with its own CSS and layout, is.
+      # #470 PR 1 (publish1), round 2: build the REAL paneapp-ai site
+      # with the generated page in place and screenshot the actual
+      # rendered result. This is the proof that replaces the old
+      # standalone-HTML preview.html (removed in round 1) -- Matt's
+      # ruling on #470: a self-styled approximation isn't good enough
+      # proof that the page looks right on the live site; only the live
+      # site's own build, with its own CSS and layout, is.
       #
-      # `paneapp-ai` is PUBLIC (confirmed by hand before writing this
-      # workflow: a plain unauthenticated `git clone` succeeds with no
-      # token) -- this checkout needs no credentials, no GitHub App, no
-      # PAT. That auth mechanism (scoped #470 PR, not started) is only
-      # needed for the LATER publish PR's actual commit+push+open-PR step
-      # against paneapp-ai -- this read-only CI checkout doesn't touch
-      # that at all.
+      # `paneapp-ai` is PRIVATE (round 1's `token: ''` anonymous checkout
+      # was wrong -- it could never have worked against a private repo;
+      # it failed in CI with "Input required and not supplied: token",
+      # not the "Repository not found" round 1's own comment predicted).
+      # Matt created a GitHub App installed on `paneapp-ai` ONLY
+      # (Contents: read & write, Pull requests: read & write) and added
+      # three Actions secrets to `pane`: DOCS_APP_ID, DOCS_APP_CLIENT_ID,
+      # DOCS_APP_PRIVATE_KEY. The mint step below uses DOCS_APP_CLIENT_ID
+      # + DOCS_APP_PRIVATE_KEY -- see that step's own comment for why
+      # DOCS_APP_ID (not DOCS_APP_CLIENT_ID) is the one that goes unused.
       #
       # Ephemeral CI scratch ONLY: no commit, no branch, no push, no `gh
       # pr create` step anywhere below (or anywhere else in this file)
       # touches `paneapp-ai` -- the checkout is discarded with the runner
-      # at the end of the job, same as the `pane` checkout.
+      # at the end of the job, same as the `pane` checkout. The minted
+      # token is scoped to `paneapp-ai` alone (never org-wide), granted
+      # `contents: read` only (this job never writes to that repo), and
+      # is never printed: no `echo`/`set -x` touches it, and
+      # `persist-credentials: false` on the checkout keeps it out of that
+      # checkout's own git config.
       # ---------------------------------------------------------------
 
-      # `token: ''` is required here, not cosmetic -- actions/checkout
-      # otherwise defaults to `${{ github.token }}` (the ambient
-      # GITHUB_TOKEN, scoped ONLY to `pane`, this workflow's own repo)
-      # even when `repository:` points somewhere else. Discovered the hard
-      # way running this exact step in CI: with no `token:` override, the
-      # fetch failed with "remote: Repository not found" against a repo
-      # already confirmed-by-hand to be public -- GitHub's API rejects a
-      # token that's valid but unauthorized for the target repo with a
-      # generic 404 rather than falling back to anonymous access, which
-      # reads exactly like "doesn't exist"/"needs a token" until you look
-      # at the actual git command being run. `token: ''` tells
-      # actions/checkout to skip auth entirely and do a plain
-      # unauthenticated clone -- the same thing the manual
-      # `git clone https://github.com/ThreeLaneStudios/paneapp-ai.git`
-      # verification (see PR description) already proved works.
-      - name: Checkout paneapp-ai (release) -- public repo, read-only, ephemeral
+      # actions/create-github-app-token's own action.yml (checked at the
+      # `v3` tag this step pins, current latest major as of writing):
+      # `client-id` is the live, non-deprecated identifier input;
+      # `app-id` carries `deprecationMessage: "Use 'client-id' instead."`
+      # literally in the action's source. So this step reads
+      # DOCS_APP_CLIENT_ID (not DOCS_APP_ID) -- DOCS_APP_ID is the secret
+      # Matt created that this workflow does not use anywhere. Told him
+      # plainly in the PR description/report, not buried here.
+      # `repositories:` scopes the minted token to paneapp-ai alone (an
+      # explicit choice, not the default -- leaving both `owner` and
+      # `repositories` unset would scope to the CURRENT repo, i.e. pane,
+      # which is also not what's wanted here; naming paneapp-ai
+      # explicitly is the only correct form). `permission-contents: read`
+      # narrows the token below even the App installation's own grant
+      # (contents: read & write) since this job only ever reads. No
+      # `permission-pull-requests` requested -- this job never opens a
+      # PR against paneapp-ai (that's a later PR per the brief).
+      - name: Mint paneapp-ai installation token (scoped, read-only, ephemeral)
+        id: paneapp-ai-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.DOCS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DOCS_APP_PRIVATE_KEY }}
+          repositories: paneapp-ai
+          permission-contents: read
+
+      - name: Checkout paneapp-ai (release) -- private repo, App-token auth, read-only, ephemeral
         uses: actions/checkout@v4
         with:
           repository: ThreeLaneStudios/paneapp-ai
           ref: release
           path: paneapp-ai-site
-          token: ''
+          token: ${{ steps.paneapp-ai-token.outputs.token }}
+          persist-credentials: false
 
       - name: Install paneapp-ai dependencies
         working-directory: paneapp-ai-site
