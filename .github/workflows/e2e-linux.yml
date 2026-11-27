@@ -333,12 +333,28 @@ jobs:
       # at the end of the job, same as the `pane` checkout.
       # ---------------------------------------------------------------
 
+      # `token: ''` is required here, not cosmetic -- actions/checkout
+      # otherwise defaults to `${{ github.token }}` (the ambient
+      # GITHUB_TOKEN, scoped ONLY to `pane`, this workflow's own repo)
+      # even when `repository:` points somewhere else. Discovered the hard
+      # way running this exact step in CI: with no `token:` override, the
+      # fetch failed with "remote: Repository not found" against a repo
+      # already confirmed-by-hand to be public -- GitHub's API rejects a
+      # token that's valid but unauthorized for the target repo with a
+      # generic 404 rather than falling back to anonymous access, which
+      # reads exactly like "doesn't exist"/"needs a token" until you look
+      # at the actual git command being run. `token: ''` tells
+      # actions/checkout to skip auth entirely and do a plain
+      # unauthenticated clone -- the same thing the manual
+      # `git clone https://github.com/ThreeLaneStudios/paneapp-ai.git`
+      # verification (see PR description) already proved works.
       - name: Checkout paneapp-ai (release) -- public repo, read-only, ephemeral
         uses: actions/checkout@v4
         with:
           repository: ThreeLaneStudios/paneapp-ai
           ref: release
           path: paneapp-ai-site
+          token: ''
 
       - name: Install paneapp-ai dependencies
         working-directory: paneapp-ai-site
