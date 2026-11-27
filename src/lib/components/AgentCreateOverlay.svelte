@@ -49,6 +49,8 @@
   } from '$lib/onboarding/seedGeneration';
   import WorkshopReview from './WorkshopReview.svelte';
   import SearchableModelSelect from './SearchableModelSelect.svelte';
+  import { sessionStore } from '$lib/stores/sessionStore';
+  import { navigateTo } from '$lib/services/navigation';
 
   // ── Props ────────────────────────────────────────────────────────────────
   /**
@@ -397,8 +399,20 @@
   }
 
   // ── Step 2: Seeding paths ─────────────────────────────────────────────────
-  function handleJustChat() {
-    // ADR-0059 D4: seeding after name-commit is optional; agent is live
+  async function handleJustChat() {
+    // ADR-0059 D4: seeding after name-commit is optional; agent is live.
+    // #475: closing the overlay alone left the user on Settings' Agents
+    // list (a settings screen) under a button labelled "Just Start
+    // Chatting." Create a fresh session bound to the agent just created
+    // and land on Home with it open — same `sessionStore.createSession` +
+    // `navigateTo({ view: 'home', sessionId })` shape ChatPanel.svelte's
+    // read-only "start new session" path and NotificationPanel.svelte's
+    // click-to-open already use. 'workspace' is the existing no-project
+    // sentinel (see ChatPanel.svelte's own default-agent auto-create call).
+    if (createdAgent) {
+      const session = await sessionStore.createSession('workspace', createdAgent.id);
+      await navigateTo({ view: 'home', sessionId: session.id });
+    }
     onClose();
   }
 

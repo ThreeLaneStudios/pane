@@ -219,24 +219,27 @@ const steps: JourneyStep[] = [
   },
   {
     name: 'just-start-chatting',
-    // Rewritten in round 2 -- see this PR's description for the old
-    // caption. handleJustChat() (AgentCreateOverlay.svelte) just calls
-    // onClose(); there is no further navigation. That lands back on the
-    // Settings Agents tab the journey opened from, not a chat pane. This
-    // is a known, pre-existing navigation gap, filed as issue #475 --
-    // not this journey's to fix — the caption now describes the actual
-    // destination.
-    caption: `Choose "Just Start Chatting" to finish. Pane returns you to the Agents list, where your new agent now appears.`,
+    // #475 fix: handleJustChat() (AgentCreateOverlay.svelte) now creates a
+    // session bound to the agent just created and navigates Home onto it
+    // (sessionStore.createSession + navigateTo's existing sessionId
+    // override -- same shape ChatPanel.svelte's read-only "start new
+    // session" path and NotificationPanel.svelte's click-to-open already
+    // use). This fixture seeds zero sessions before this step, so the
+    // session Home opens on here is necessarily the one just created for
+    // the new agent.
+    caption: `Choose “Just Start Chatting.” Pane opens Home with a new chat for your agent, ready for your first message.`,
     action: async (tauriPage) => {
       await tauriPage.click('[data-testid="agent-create-seed-skip"]');
-      await tauriPage.waitForSelector('[data-testid="agents-captain-crew-helper"]', 10000);
+      await tauriPage.getByPlaceholder('Message your agents…').waitFor(10000);
     },
     check: async (tauriPage) => {
-      // Overlay is gone and we're back on the Agents tab specifically
-      // (not just "some screen with a sidebar") -- same helper-line
-      // selector the opening step's own check uses.
-      expect(await tauriPage.getByText('+ New agent', { exact: true }).isVisible()).toBe(true);
-      expect(await tauriPage.getByText('Research Agent', { exact: false }).isVisible()).toBe(true);
+      // Left Settings entirely -- not just "the overlay closed," which is
+      // all the old code did (it left Settings' Agents tab on screen).
+      expect(await tauriPage.isVisible('[data-testid="agents-captain-crew-helper"]')).toBe(false);
+      expect(await tauriPage.getByText('+ New agent', { exact: true }).isVisible()).toBe(false);
+      // Home's chat composer is open and writable, proving a real,
+      // non-read-only session is active (not a missing/unresolved one).
+      expect(await tauriPage.getByPlaceholder('Message your agents…').isVisible()).toBe(true);
     },
   },
 ];
