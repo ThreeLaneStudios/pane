@@ -22,8 +22,12 @@ name: E2E — Linux Smoke (plumbing proof)
 #
 # docs/spec/testing.md §25.13 says journeys do not run on ordinary pull
 # requests. The pull_request trigger below is scoped to this workflow
-# file's own path only, so this PR can prove itself green (or honestly
-# red) before merge, without adding CI time to any other PR -- it is not a
+# file's own path AND the e2e/ directory (journeys, helpers, test setup)
+# -- so this PR (and PR 480 round 2, a helper-only change) can prove
+# itself green (or honestly red) before merge without a manual
+# workflow_dispatch, and so can any future PR that touches a journey, a
+# shared helper, or the test config. Ordinary PRs that touch neither this
+# file nor e2e/** still don't trigger this workflow at all -- it is not a
 # general PR trigger and does not violate §25.13's rule.
 #
 # #470 PR 4: this same job now also runs the first journey
@@ -44,6 +48,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/e2e-linux.yml'
+      - 'e2e/**'
 
 permissions:
   contents: read
