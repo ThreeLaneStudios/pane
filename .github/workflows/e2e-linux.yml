@@ -283,9 +283,14 @@ jobs:
       # generated page targets the EXISTING hand-written page's address,
       # which is not this journey's own name (`create-an-agent`) -- see
       # e2e/docs-template/generate.ts's own header comment for why those
-      # differ. Publishing is a later PR; this step only ever writes to
-      # e2e/docs-template-output/, never to paneapp-ai.
-      - name: Generate docs page + preview (create-an-agent)
+      # differ. Publishing (committing to paneapp-ai for real) is a later
+      # PR; this step only ever writes to e2e/docs-template-output/.
+      #
+      # #470 PR 1 (publish1): no longer also writes preview.html -- see
+      # generate.ts's own header comment for why that standalone-HTML
+      # proof is removed rather than kept alongside the new real-site
+      # screenshot below.
+      - name: Generate docs page (create-an-agent)
         run: |
           node e2e/docs-template/generate.ts \
             --manifest e2e/journeys-output/create-an-agent/manifest.json \
@@ -304,6 +309,166 @@ jobs:
       - name: Stop mock Ollama
         if: always()
         run: kill "$(cat /tmp/mock-ollama.pid)" 2>/dev/null || true
+
+      # ---------------------------------------------------------------
+      # #470 PR 1 (publish1), round 2: build the REAL paneapp-ai site
+      # with the generated page in place and screenshot the actual
+      # rendered result. This is the proof that replaces the old
+      # standalone-HTML preview.html (removed in round 1) -- Matt's
+      # ruling on #470: a self-styled approximation isn't good enough
+      # proof that the page looks right on the live site; only the live
+      # site's own build, with its own CSS and layout, is.
+      #
+      # `paneapp-ai` is PRIVATE (round 1's `token: ''` anonymous checkout
+      # was wrong -- it could never have worked against a private repo;
+      # it failed in CI with "Input required and not supplied: token",
+      # not the "Repository not found" round 1's own comment predicted).
+      # Matt created a GitHub App installed on `paneapp-ai` ONLY
+      # (Contents: read & write, Pull requests: read & write) and added
+      # three Actions secrets to `pane`: DOCS_APP_ID, DOCS_APP_CLIENT_ID,
+      # DOCS_APP_PRIVATE_KEY. The mint step below uses DOCS_APP_CLIENT_ID
+      # + DOCS_APP_PRIVATE_KEY -- see that step's own comment for why
+      # DOCS_APP_ID (not DOCS_APP_CLIENT_ID) is the one that goes unused.
+      #
+      # Ephemeral CI scratch ONLY: no commit, no branch, no push, no `gh
+      # pr create` step anywhere below (or anywhere else in this file)
+      # touches `paneapp-ai` -- the checkout is discarded with the runner
+      # at the end of the job, same as the `pane` checkout. The minted
+      # token is scoped to `paneapp-ai` alone (never org-wide), granted
+      # `contents: read` only (this job never writes to that repo), and
+      # is never printed: no `echo`/`set -x` touches it, and
+      # `persist-credentials: false` on the checkout keeps it out of that
+      # checkout's own git config.
+      # ---------------------------------------------------------------
+
+      # actions/create-github-app-token's own action.yml (checked at the
+      # `v3` tag this step pins, current latest major as of writing):
+      # `client-id` is the live, non-deprecated identifier input;
+      # `app-id` carries `deprecationMessage: "Use 'client-id' instead."`
+      # literally in the action's source. So this step reads
+      # DOCS_APP_CLIENT_ID (not DOCS_APP_ID) -- DOCS_APP_ID is the secret
+      # Matt created that this workflow does not use anywhere. Told him
+      # plainly in the PR description/report, not buried here.
+      # `repositories:` scopes the minted token to paneapp-ai alone (an
+      # explicit choice, not the default -- leaving both `owner` and
+      # `repositories` unset would scope to the CURRENT repo, i.e. pane,
+      # which is also not what's wanted here; naming paneapp-ai
+      # explicitly is the only correct form). `permission-contents: read`
+      # narrows the token below even the App installation's own grant
+      # (contents: read & write) since this job only ever reads. No
+      # `permission-pull-requests` requested -- this job never opens a
+      # PR against paneapp-ai (that's a later PR per the brief).
+      - name: Mint paneapp-ai installation token (scoped, read-only, ephemeral)
+        id: paneapp-ai-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.DOCS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DOCS_APP_PRIVATE_KEY }}
+          repositories: paneapp-ai
+          permission-contents: read
+
+      - name: Checkout paneapp-ai (release) -- private repo, App-token auth, read-only, ephemeral
+        uses: actions/checkout@v4
+        with:
+          repository: ThreeLaneStudios/paneapp-ai
+          ref: release
+          path: paneapp-ai-site
+          token: ${{ steps.paneapp-ai-token.outputs.token }}
+          persist-credentials: false
+
+      - name: Install paneapp-ai dependencies
+        working-directory: paneapp-ai-site
+        run: npm ci
+
+      # Drops the generated page at Matt's ruling slug (docs/creating-an-
+      # agent, taking over the existing hand-written page's address) and
+      # the six new images alongside (NOT instead of) the 8 existing
+      # images there today -- deleting those 8 and repointing nav.ts is
+      # explicitly the LATER publishing PR's job (Matt's ruling), not
+      # this one. Confirmed no filename collision between the old 8 and
+      # the new 6 (entirely different naming schemes), so a plain copy
+      # here is safe and doesn't silently clobber anything.
+      - name: Drop the generated docs page + images into the paneapp-ai checkout
+        run: |
+          cp e2e/docs-template-output/creating-an-agent/+page.svelte \
+            paneapp-ai-site/src/routes/docs/creating-an-agent/+page.svelte
+          mkdir -p paneapp-ai-site/static/assets/tutorials/creating-an-agent
+          cp e2e/docs-template-output/creating-an-agent/images/*.png \
+            paneapp-ai-site/static/assets/tutorials/creating-an-agent/
+
+      # `npm run build` (never `npm install`/`npm run dev`) runs
+      # `node scripts/validate-short-links.js && vite build` (paneapp-
+      # ai's own package.json) -- link validation runs as part of this
+      # step, not skipped. A broken link anywhere on the site (not just
+      # this new page) fails this step and therefore this job.
+      - name: Build paneapp-ai (npm run build -- includes short-link validation)
+        working-directory: paneapp-ai-site
+        run: npm run build
+
+      # Browsers are NOT installed anywhere else in this job --
+      # tauri-plugin-playwright drives the native Pane app over its own
+      # Unix-socket bridge (screenshot.ts), never a real browser context,
+      # so @playwright/test's chromium binary has never been needed until
+      # this step. Scoped to chromium only (not the full browser matrix)
+      # since this step only ever screenshots one page in one browser.
+      - name: Install Playwright Chromium (screenshot tool for the real-site build only)
+        run: npx playwright install --with-deps chromium
+
+      # vite preview serves the actual `npm run build` output (adapter-
+      # cloudflare's build, same as what Cloudflare Pages would serve) --
+      # not a dev server, not a second build. Wait-loop idiom matches
+      # this same file's existing "Start mock Ollama"/"Start Pane"
+      # steps above rather than a fixed sleep.
+      - name: Serve the built paneapp-ai site
+        working-directory: paneapp-ai-site
+        run: |
+          npm run preview -- --port 4321 --host 127.0.0.1 > /tmp/paneapp-ai-preview.log 2>&1 &
+          echo $! > /tmp/paneapp-ai-preview.pid
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:4321/docs/creating-an-agent > /dev/null; then
+              echo "✅ paneapp-ai preview server serving /docs/creating-an-agent after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          if ! curl -sf http://127.0.0.1:4321/docs/creating-an-agent > /dev/null; then
+            echo "❌ paneapp-ai preview server did not respond after 30s"
+            cat /tmp/paneapp-ai-preview.log
+            exit 1
+          fi
+
+      # Full-page capture (not just the fold) -- `--wait-for-selector
+      # footer` waits for the page's own last-rendered element rather
+      # than a fixed timeout, so this doesn't race the page's own
+      # hydration/render the same way rule 8 forbids doing to the
+      # journey's screenshots (this isn't journey code, but the same
+      # "wait for a real signal, not a clock" preference applies).
+      - name: Screenshot the real rendered /docs/creating-an-agent page
+        run: |
+          mkdir -p e2e/docs-template-output/creating-an-agent/site-screenshot
+          npx playwright screenshot \
+            --full-page \
+            --wait-for-selector=footer \
+            --viewport-size=1400,1000 \
+            "http://127.0.0.1:4321/docs/creating-an-agent" \
+            e2e/docs-template-output/creating-an-agent/site-screenshot/creating-an-agent-rendered.png
+
+      - name: Stop paneapp-ai preview server
+        if: always()
+        run: kill "$(cat /tmp/paneapp-ai-preview.pid)" 2>/dev/null || true
+
+      # Belt-and-suspenders, matching the task's own explicit requirement:
+      # confirms this job never staged/committed anything in the
+      # paneapp-ai checkout (the copied-in page/images are untracked
+      # working-tree changes only -- `git status --porcelain` will show
+      # them as modified/untracked, which is expected and fine; this step
+      # is a readable log line for a human auditing the run, not a gate --
+      # the actual guarantee is structural: no step anywhere in this file
+      # runs `git commit`/`git push`/`gh pr create` against paneapp-ai-site).
+      - name: Log paneapp-ai working-tree state (never committed/pushed)
+        if: always()
+        working-directory: paneapp-ai-site
+        run: git status --porcelain || true
 
       - name: Upload Pane process log
         if: always()
@@ -356,15 +521,20 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      # #470 docs-template PR: both outputs the task asked for in one
-      # artifact -- the real +page.svelte (what would eventually be
-      # committed to paneapp-ai in a later publish PR) AND the
-      # self-contained preview.html + images/ a human can open directly
-      # from the downloaded zip with no build step. error, matching the
-      # journey artifact above: the generate step either already failed
-      # the job or already wrote all three outputs -- a missing artifact
-      # here would be a silent regression, not an expected empty case.
-      - name: Upload docs page + preview artifact (create-an-agent)
+      # #470 PR 1 (publish1): this artifact's CONTENTS changed, its NAME
+      # didn't -- Matt's ruling replaces the old self-styled
+      # preview.html with a screenshot of the real paneapp-ai build, but
+      # it's still "the thing Matt opens to see the page," so it keeps
+      # the same artifact name a reviewer already knows to look for.
+      # Now holds: the real +page.svelte (what gets committed to
+      # paneapp-ai in the later publish PR), images/ (the six step
+      # screenshots, same as before), and site-screenshot/ (new -- the
+      # full-page capture of the actual rendered /docs/creating-an-agent
+      # route on a real paneapp-ai build, Matt's actual proof). error,
+      # matching the journey artifact above: by this point the job has
+      # either already failed loudly or already wrote all of these --
+      # a missing artifact here would be a silent regression.
+      - name: Upload docs page + rendered-site-screenshot artifact (create-an-agent)
         if: always()
         uses: actions/upload-artifact@v4
         with:

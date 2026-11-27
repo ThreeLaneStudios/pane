@@ -16,7 +16,7 @@
     "prebuild": "bash scripts/pre-build.sh"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "^1.65.1",
     "@srsholmes/tauri-playwright": "^0.4.1",
     "@sveltejs/adapter-auto": "^7.0.0",
     "@sveltejs/adapter-static": "^3.0.11",

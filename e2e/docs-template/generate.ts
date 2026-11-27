@@ -4,8 +4,7 @@
 // screenshots, and writes:
 //
 //   <out>/+page.svelte   -- the real deliverable (page.ts)
-//   <out>/preview.html   -- self-contained HTML proof, images copied in (preview.ts)
-//   <out>/images/*.png   -- the screenshots preview.html references by relative path
+//   <out>/images/*.png   -- the screenshots the generated page references
 //
 // Run directly via `node` (Node 26, native TypeScript type-stripping --
 // no ts-node/tsx dependency added for this), not through Playwright --
@@ -15,6 +14,18 @@
 //     --manifest e2e/journeys-output/create-an-agent/manifest.json \
 //     --slug creating-an-agent \
 //     --out e2e/docs-template-output/creating-an-agent
+//
+// #470 PR 1 (publish1): the standalone-HTML preview.ts/preview.html this
+// script used to also write is REMOVED (not just unused) -- Matt's
+// ruling on #470 replaces it with a CI step that builds the REAL
+// paneapp-ai site with this script's `+page.svelte` output dropped in
+// and screenshots the actual rendered page (see
+// .github/workflows/e2e-linux.yml's "Build paneapp-ai with the generated
+// docs page" job). The old preview.html's own header comment said
+// plainly why it was only ever an approximation (its CSS was hand-rolled,
+// not copied from paneapp-ai's real docs.css) -- that's exactly the gap
+// the real-site-build proof closes, so keeping preview.ts around as dead
+// code once nothing calls it would just be unexercised surface.
 //
 // Why `--slug` is a separate, explicit argument from the manifest's own
 // `journey` field: Matt's ruling on #470 is that the generated page takes
@@ -28,15 +39,14 @@
 //
 // Determinism: every input this script reads is the manifest file plus
 // the exact image filenames `manifest.steps` already names (never a
-// directory listing of the images folder) -- see page.ts/preview.ts for
-// the rendering functions' own determinism notes. Running this script
-// twice against the same manifest + images produces byte-identical
-// +page.svelte and preview.html output (verified; see PR description).
+// directory listing of the images folder) -- see page.ts's own
+// determinism notes. Running this script twice against the same
+// manifest + images produces byte-identical `+page.svelte` output
+// (re-verified for this PR's markup rewrite; see PR description).
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { renderPageSvelte } from './page.ts';
-import { renderPreviewHtml } from './preview.ts';
 import type { JourneyManifest } from '../journeys/_runner.ts';
 
 function parseCliArgs(argv: string[]): { manifestPath: string; slug: string; outDir: string } {
@@ -83,10 +93,7 @@ function main(): void {
     fs.copyFileSync(path.join(manifestDir, step.image), path.join(imagesOutDir, step.image));
   }
 
-  const previewHtml = renderPreviewHtml(manifest, 'images', knownJourneys);
-  fs.writeFileSync(path.join(outDir, 'preview.html'), previewHtml);
-
-  console.log(`docs-template: wrote ${outDir}/+page.svelte, ${outDir}/preview.html, and ${manifest.steps.length} image(s) to ${imagesOutDir}/`);
+  console.log(`docs-template: wrote ${outDir}/+page.svelte and ${manifest.steps.length} image(s) to ${imagesOutDir}/`);
 }
 
 main();
