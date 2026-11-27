@@ -27,7 +27,7 @@ import type { TauriPage } from '@srsholmes/tauri-playwright';
  * doesn't understand (e.g. a 16-bit-depth or interlaced PNG) rather than
  * silently passing.
  */
-function decodePng(buf: Buffer): { width: number; height: number; channels: number; pixels: Buffer } {
+function decodePng(buf: Buffer): { width: number; height: number; channels: number; colorType: number; pixels: Buffer } {
   let offset = 8; // skip the 8-byte PNG signature
   let width = 0;
   let height = 0;
@@ -101,7 +101,72 @@ function decodePng(buf: Buffer): { width: number; height: number; channels: numb
     }
     prevRowStart = outRowStart;
   }
-  return { width, height, channels, pixels };
+  return { width, height, channels, colorType, pixels };
+}
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const lenBuf = Buffer.alloc(4);
+  lenBuf.writeUInt32BE(data.length, 0);
+  const typeBuf = Buffer.from(type, 'ascii');
+  const crc = zlib.crc32(Buffer.concat([typeBuf, data])) >>> 0;
+  const crcBuf = Buffer.alloc(4);
+  crcBuf.writeUInt32BE(crc, 0);
+  return Buffer.concat([lenBuf, typeBuf, data, crcBuf]);
+}
+
+/**
+ * Minimal, dependency-free PNG encoder -- the write side `decodePng` above
+ * never needed until this PR's crop option (§25.13 round 2, PR 483):
+ * cropping means writing a SMALLER real PNG back to disk, not slicing
+ * bytes out of the original file. Always emits filter type 0 (None) per
+ * scanline -- correctness over compression ratio, same dependency-free
+ * reasoning `decodePng`'s own header comment gives for not adding a
+ * decoding package; these are small, already-lossless captures, not a
+ * performance-sensitive path. `zlib.crc32` (Node 22.2+, available here --
+ * this repo already requires Node 26, see e2e/docs-template/generate.ts's
+ * header comment) avoids hand-rolling a CRC table for a one-off encoder.
+ */
+function encodePng({
+  width,
+  height,
+  colorType,
+  pixels,
+}: {
+  width: number;
+  height: number;
+  colorType: number;
+  pixels: Buffer;
+}): Buffer {
+  const channelsByColorType: Record<number, number> = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 };
+  const channels = channelsByColorType[colorType];
+  if (!channels) {
+    throw new Error(`screenshot PNG encode: unsupported color type ${colorType}`);
+  }
+  const rowBytes = width * channels;
+  const filtered = Buffer.alloc((rowBytes + 1) * height);
+  for (let y = 0; y < height; y++) {
+    filtered[y * (rowBytes + 1)] = 0; // filter type 0 (None)
+    pixels.copy(filtered, y * (rowBytes + 1) + 1, y * rowBytes, (y + 1) * rowBytes);
+  }
+  const idatData = zlib.deflateSync(filtered);
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = colorType;
+  ihdr[10] = 0; // compression method
+  ihdr[11] = 0; // filter method
+  ihdr[12] = 0; // interlace method
+
+  return Buffer.concat([
+    PNG_SIGNATURE,
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', idatData),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
 }
 
 /**
@@ -135,6 +200,22 @@ function analyzeVariation({ width, height, channels, pixels }: { width: number; 
 }
 
 export type ScreenshotVariation = { distinctSampledColors: number; maxChannelRange: number };
+
+export type ScreenshotCropOptions = {
+  /**
+   * CSS selector for the element whose real bounding box becomes the crop
+   * region -- a `getBoundingClientRect()` call (see the plugin's own
+   * `Command::BoundingBox` handler), not a guessed or hardcoded
+   * rectangle, so a layout change moves the crop with it instead of
+   * silently cropping the wrong area.
+   */
+  selector: string;
+  /**
+   * Padding added on every side, in CSS pixels, so the crop doesn't cut
+   * flush to the element's edges.
+   */
+  paddingPx: number;
+};
 
 export type ScreenshotThresholds = {
   /** Minimum on-disk byte size. Default 1024. */
@@ -237,6 +318,42 @@ async function waitForScreenStable(
 
   await hideCaret(tauriPage);
   try {
+    // PR 483 round 2: close a real one-frame race that let screenshot 01
+    // ("General" still highlighted while the Agents tab's content was
+    // already on screen) through intermittently. A CSS transition
+    // triggered by the DOM mutation this screenshot call follows (here,
+    // Settings.svelte's `.seg-btn.active` toggle, `transition: all 0.2s`)
+    // is not necessarily a `getAnimations()`-visible Animation on the SAME
+    // tick as that mutation -- browsers defer creating the actual
+    // CSSTransition object to the next style-recalc/paint pass, not the
+    // microtask that changed the class. Calling (a) below before that
+    // pass has happened sees an EMPTY `getAnimations()` list -- which (a)
+    // reads as "nothing running", vacuously true -- even though a
+    // transition is about to start, so (a) could return immediately and
+    // (b)'s byte-identical backstop could then lock onto two frames both
+    // taken before the transition had rendered a single visible step.
+    // This is a real gap in THIS helper, not in the opening step's check
+    // (which already asserts the correct app state, `activeTab ===
+    // 'agents'`, before this function is ever called) -- PR 474 round 3's
+    // deleted per-step poll on this same surface was reading the tab's
+    // painted colour directly, which this double-`requestAnimationFrame`
+    // replaces with an equivalent, helper-level guarantee: by the time it
+    // resolves, the browser has committed at least one real style-recalc-
+    // and-paint cycle since the action that preceded this screenshot, so
+    // any transition that cycle creates is already a "running" Animation
+    // (a) can actually see, instead of one (a) can race past. Not a sleep
+    // -- bounded by two real frame callbacks, not a fixed-duration timer,
+    // and it costs at most ~1-2 frames (well under 32ms) when nothing is
+    // transitioning at all. The quadrupled pixel count (2x resolution,
+    // this same PR's docs-template work) didn't create this race -- it's
+    // a one-frame registration gap present at any resolution -- but it
+    // plausibly shifted how often CI's actual polling cadence landed
+    // inside the pre-existing window, which is why this surfaced as
+    // "intermittent" rather than "always wrong".
+    await tauriPage.evaluate(
+      'new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
+    );
+
     // (a) All running animations/transitions finished.
     const animationsSettledExpr =
       `document.getAnimations().every((a) => a.playState !== 'running' && a.playState !== 'pending')`;
@@ -279,6 +396,70 @@ async function waitForScreenStable(
 }
 
 /**
+ * Crops the full-frame screenshot already written to `screenshotPath`
+ * down to `crop.selector`'s real bounding box, padded by
+ * `crop.paddingPx` CSS pixels on every side, and overwrites the file with
+ * the smaller PNG. An option on `captureAndValidateScreenshot`, not a
+ * per-step hardcoded rectangle (PR 483 round 2) -- a journey step opts in
+ * by passing `crop`; a step that doesn't (the first and last step of
+ * "Create an agent", both deliberately full-screen) is untouched.
+ *
+ * `boundingBox()` reports CSS pixels (`getBoundingClientRect()`'s native
+ * unit); the on-disk screenshot is captured in device pixels (e.g. 2x
+ * under `e2e-linux.yml`'s `GDK_SCALE=2`). Rather than trust
+ * `window.devicePixelRatio` as a second, separately-sourced assumption
+ * that could drift from whatever the native capture path actually used,
+ * the scale factor here is derived from the two real signals that settle
+ * the question directly for THIS capture: the screenshot's own decoded
+ * pixel width and the page's own `window.innerWidth` at the moment of
+ * capture. Self-consistent on any platform/scale by construction.
+ */
+async function cropScreenshotToElement(
+  tauriPage: TauriPage,
+  screenshotPath: string,
+  crop: ScreenshotCropOptions,
+): Promise<Buffer> {
+  const fullBytes = fs.readFileSync(screenshotPath);
+  const decoded = decodePng(fullBytes);
+
+  const box = await tauriPage.boundingBox(crop.selector);
+  if (!box) {
+    throw new Error(`screenshot crop: no element matched selector ${JSON.stringify(crop.selector)}`);
+  }
+  const innerWidthCss = Number(await tauriPage.evaluate('window.innerWidth'));
+  const scale = decoded.width / innerWidthCss;
+
+  const x0 = Math.max(0, Math.round((box.x - crop.paddingPx) * scale));
+  const y0 = Math.max(0, Math.round((box.y - crop.paddingPx) * scale));
+  const x1 = Math.min(decoded.width, Math.round((box.x + box.width + crop.paddingPx) * scale));
+  const y1 = Math.min(decoded.height, Math.round((box.y + box.height + crop.paddingPx) * scale));
+  const cropWidth = x1 - x0;
+  const cropHeight = y1 - y0;
+  if (cropWidth <= 0 || cropHeight <= 0) {
+    throw new Error(
+      `screenshot crop: computed an empty region for ${JSON.stringify(crop.selector)} ` +
+      `(box=${JSON.stringify(box)}, scale=${scale})`,
+    );
+  }
+
+  const croppedPixels = Buffer.alloc(cropWidth * cropHeight * decoded.channels);
+  for (let row = 0; row < cropHeight; row++) {
+    const srcStart = ((y0 + row) * decoded.width + x0) * decoded.channels;
+    const srcEnd = srcStart + cropWidth * decoded.channels;
+    decoded.pixels.copy(croppedPixels, row * cropWidth * decoded.channels, srcStart, srcEnd);
+  }
+
+  const croppedPng = encodePng({
+    width: cropWidth,
+    height: cropHeight,
+    colorType: decoded.colorType,
+    pixels: croppedPixels,
+  });
+  fs.writeFileSync(screenshotPath, croppedPng);
+  return croppedPng;
+}
+
+/**
  * Captures a screenshot to `screenshotPath` and validates it from disk --
  * never from `tauriPage.screenshot()`'s returned buffer, which
  * tauri-plugin-playwright 0.4.1 returns empty (`Buffer.alloc(0)`)
@@ -292,16 +473,28 @@ async function waitForScreenStable(
  * visually stable (see `waitForScreenStable` above) -- every journey
  * step's screenshot goes through this one function, so the stability
  * wait applies everywhere without any journey file asking for it.
+ *
+ * PR 483 round 2: an optional `crop` crops the just-captured full-frame
+ * PNG down to one element's real bounding box (see
+ * `cropScreenshotToElement` above) before any of the validation below
+ * runs -- so the size-floor and blank-frame colour heuristics are
+ * proven against the SAME bytes a cropped step actually ships, not the
+ * full frame it was cropped from.
  */
 export async function captureAndValidateScreenshot(
   tauriPage: TauriPage,
   screenshotPath: string,
   thresholds: ScreenshotThresholds = {},
+  crop?: ScreenshotCropOptions,
 ): Promise<{ onDisk: Buffer; variation: ScreenshotVariation }> {
   const { minBytes = 1024, minDistinctColors = 10, minChannelRange = 20, stabilityTimeoutMs = 10000 } = thresholds;
 
   fs.mkdirSync(path.dirname(screenshotPath), { recursive: true });
-  const onDisk = await waitForScreenStable(tauriPage, screenshotPath, stabilityTimeoutMs);
+  let onDisk = await waitForScreenStable(tauriPage, screenshotPath, stabilityTimeoutMs);
+
+  if (crop) {
+    onDisk = await cropScreenshotToElement(tauriPage, screenshotPath, crop);
+  }
 
   // It must actually have landed on disk at the given path.
   expect(fs.existsSync(screenshotPath)).toBe(true);

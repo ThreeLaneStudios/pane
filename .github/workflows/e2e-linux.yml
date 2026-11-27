@@ -214,11 +214,29 @@ jobs:
           mkdir -p "$PANE_TEST_ROOT"
           cargo test --lib seed_journey_fixture -- --ignored --nocapture
 
+      # #470 docs-template PR: GDK_SCALE=2 + a doubled Xvfb screen size are
+      # both display/scale *settings*, not a capture-pipeline change --
+      # investigated per the task's instruction to reach for a 2x capture
+      # ("match the site's existing retina tutorial images") only if it's
+      # reachable as a setting. GDK_SCALE is GTK3's own documented backend
+      # scale-factor override (independent of whatever Xvfb's declared
+      # resolution reports); tauri-plugin-playwright's Linux capture path
+      # (native_capture.rs's `platform::screenshot`) takes its PNG straight
+      # from webkit2gtk's `WebView::snapshot()`, whose surface that
+      # function's own comment confirms is "already an image surface sized
+      # in *device* pixels" -- so doubling the GDK scale factor doubles the
+      # snapshot's pixel dimensions with no change to any Rust or
+      # TypeScript capture code. The Xvfb screen is widened/heightened to
+      # 2560x1700 (was 1280x800) so the now-2400x1600-device-pixel window
+      # (1200x800 logical × 2) has room to exist on the virtual display at
+      # all -- a window physically can't be larger than the X server's own
+      # framebuffer. No other step in this job changes; e2e/helpers/
+      # screenshot.ts and every journey step file are untouched.
       - name: Start Pane under Xvfb, wait for the test socket
         run: |
           mkdir -p "$PANE_TEST_ROOT"
           rm -f /tmp/tauri-playwright.sock
-          xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" \
+          GDK_SCALE=2 xvfb-run --auto-servernum --server-args="-screen 0 2560x1700x24" \
             ./src-tauri/target/debug/pane > /tmp/pane-test.log 2>&1 &
           echo $! > /tmp/pane.pid
           echo "Pane starting (PID $(cat /tmp/pane.pid)), waiting for test socket..."
@@ -256,6 +274,23 @@ jobs:
       # (PR 474) added an opening step -- 6 steps/PNGs now, not 5.
       - name: Run "Create an agent" journey
         run: npx playwright test --config=e2e/playwright.config.ts --project=journeys
+
+      # #470 docs-template PR: consumes the SAME run's manifest.json +
+      # screenshots the journey step above just wrote -- no cross-job
+      # download, no second checkout. Runs via plain `node` (Node 26's
+      # native TypeScript support), not Playwright -- this is a build
+      # step, not a test. `--slug creating-an-agent` is Matt's ruling: the
+      # generated page targets the EXISTING hand-written page's address,
+      # which is not this journey's own name (`create-an-agent`) -- see
+      # e2e/docs-template/generate.ts's own header comment for why those
+      # differ. Publishing is a later PR; this step only ever writes to
+      # e2e/docs-template-output/, never to paneapp-ai.
+      - name: Generate docs page + preview (create-an-agent)
+        run: |
+          node e2e/docs-template/generate.ts \
+            --manifest e2e/journeys-output/create-an-agent/manifest.json \
+            --slug creating-an-agent \
+            --out e2e/docs-template-output/creating-an-agent
 
       - name: Stop Pane
         if: always()
@@ -318,5 +353,22 @@ jobs:
         with:
           name: pane-journey-create-an-agent
           path: e2e/journeys-output/create-an-agent/
+          retention-days: 30
+          if-no-files-found: error
+
+      # #470 docs-template PR: both outputs the task asked for in one
+      # artifact -- the real +page.svelte (what would eventually be
+      # committed to paneapp-ai in a later publish PR) AND the
+      # self-contained preview.html + images/ a human can open directly
+      # from the downloaded zip with no build step. error, matching the
+      # journey artifact above: the generate step either already failed
+      # the job or already wrote all three outputs -- a missing artifact
+      # here would be a silent regression, not an expected empty case.
+      - name: Upload docs page + preview artifact (create-an-agent)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pane-docs-page-preview-create-an-agent
+          path: e2e/docs-template-output/creating-an-agent/
           retention-days: 30
           if-no-files-found: error
