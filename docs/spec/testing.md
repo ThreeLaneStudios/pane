@@ -446,7 +446,7 @@ Journeys do not run on ordinary pull requests. A journey broken by an ordinary P
 5. **Paid providers are captured up to the setup screens only.** A journey never needs a real key.
 6. **A PR that changes a covered flow updates its journey in the same PR.**
 7. **A journey starts from Home and shows how to reach the feature.** Not from the middle of a flow — the first step's action is the click path a real reader would take to get there.
-8. **Each screenshot is taken after its action, so the result is visible.** A step with no way to check that is a step that shouldn't exist yet.
+8. **Each screenshot is taken after its action, so the result is visible.** A step with no way to check that is a step that shouldn't exist yet. If the action changes a CSS-transitioned property — an element's enabled, disabled, active, or visible state fading, sliding, or recoloring into place — the check must poll the actual painted value (`getComputedStyle`), not the DOM attribute or class that triggers the transition. The attribute or class can flip before the pixels catch up; a check that reads either one can pass while the screenshot still shows the old, mid-transition frame.
 9. **A journey ends on the outcome its title promises.** If the real destination differs from what the title implies, the journey captures the real one — it does not stop early to avoid saying so.
 10. **A fork in a flow becomes its own journey, linked from that step.** A journey follows one path start to finish; it does not branch mid-script to cover a second outcome.
 
