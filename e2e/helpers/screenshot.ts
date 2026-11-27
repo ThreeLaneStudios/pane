@@ -143,7 +143,126 @@ export type ScreenshotThresholds = {
   minDistinctColors?: number;
   /** Minimum max-channel range (blank-frame rejection). Default 20. */
   minChannelRange?: number;
+  /** Bounded deadline for the stability wait below. Default 10000ms. */
+  stabilityTimeoutMs?: number;
 };
+
+// PR 480 round 2 — moved here from per-step polls in individual journeys
+// (e.g. create-an-agent.journey.ts's deleted `dotPaintedActiveExpr`,
+// `activeTabContrastExpr`, `ctaPaintedEnabledExpr`). Five separate
+// bespoke paint checks across four journey steps still missed a real
+// defect (screenshot 05 showed the wrong progress dot in CI run
+// 46011622928) because each one only knew how to watch ONE specific CSS
+// property on ONE specific element. This helper doesn't guess which
+// property might still be animating -- it asks the browser what's
+// actually still running, for the whole document, every time, so no
+// journey author has to rediscover "the painted pixel lags the class/
+// attribute" for each new element they add a screenshot of.
+//
+// Id used to find/remove the injected caret-hiding <style> tag so
+// repeated calls across steps don't stack duplicate elements.
+const CARET_HIDE_STYLE_ID = '__e2e-caret-hide__';
+
+/**
+ * A blinking text-input caret is real, continuous repaint that
+ * `document.getAnimations()` cannot see (it's not a CSS animation or
+ * transition -- most engines implement it as a timer-driven native
+ * paint) and that makes two consecutive screenshots never match: the
+ * condition (b) below checks for would never settle while a field is
+ * focused. Disabling `caret-color` document-wide before the stability
+ * wait removes that source of permanent instability; the element is
+ * removed again once this step's capture is done so it doesn't leak
+ * into whatever the next action does.
+ */
+async function hideCaret(tauriPage: TauriPage): Promise<void> {
+  await tauriPage.evaluate(`(() => {
+    if (document.getElementById('${CARET_HIDE_STYLE_ID}')) return;
+    const style = document.createElement('style');
+    style.id = '${CARET_HIDE_STYLE_ID}';
+    style.textContent = '*, *::before, *::after { caret-color: transparent !important; }';
+    document.head.appendChild(style);
+  })()`);
+}
+
+async function restoreCaret(tauriPage: TauriPage): Promise<void> {
+  await tauriPage.evaluate(`(() => {
+    const style = document.getElementById('${CARET_HIDE_STYLE_ID}');
+    if (style) style.remove();
+  })()`);
+}
+
+/**
+ * Waits until the screen is visually stable, then captures it to
+ * `screenshotPath` and returns the captured bytes. Two conditions, both
+ * must hold:
+ *
+ * (a) `document.getAnimations()` -- every running CSS animation/
+ *     transition on the whole document, not a hand-picked selector --
+ *     reports nothing still running or pending.
+ * (b) Two screenshots taken back to back are byte-identical. This is
+ *     the backstop for anything (a) can't see: a late image decode, a
+ *     JS-driven repaint with no Web Animations entry, etc.
+ *
+ * The caret is hidden for the duration (see `hideCaret` above) so a
+ * blinking cursor can't make (b) loop forever.
+ *
+ * Bounded by `timeoutMs`; throws a specific error naming which
+ * condition never settled rather than silently returning an unstable
+ * frame. No sleeps -- (a) polls via the plugin's own `waitForFunction`,
+ * and (b) is paced by the real round-trip latency of each native
+ * screenshot call, not an added delay.
+ */
+async function waitForScreenStable(
+  tauriPage: TauriPage,
+  screenshotPath: string,
+  timeoutMs: number,
+): Promise<Buffer> {
+  const deadline = Date.now() + timeoutMs;
+  const tmpA = `${screenshotPath}.stability-a.png`;
+  const tmpB = `${screenshotPath}.stability-b.png`;
+
+  await hideCaret(tauriPage);
+  try {
+    // (a) All running animations/transitions finished.
+    const animationsSettledExpr =
+      `document.getAnimations().every((a) => a.playState !== 'running' && a.playState !== 'pending')`;
+    try {
+      await tauriPage.waitForFunction(animationsSettledExpr, Math.max(1, deadline - Date.now()));
+    } catch {
+      throw new Error(
+        `screenshot stability wait for ${screenshotPath} timed out after ${timeoutMs}ms: ` +
+        `document.getAnimations() still reports a running/pending CSS animation or ` +
+        `transition on the page.`,
+      );
+    }
+
+    // (b) Two consecutive captures byte-identical.
+    let previous: Buffer | null = null;
+    let previousPath = tmpB;
+    for (;;) {
+      const current = previousPath === tmpA ? tmpB : tmpA;
+      await tauriPage.screenshot({ path: current });
+      const bytes = fs.readFileSync(current);
+      if (previous && bytes.equals(previous)) {
+        fs.copyFileSync(current, screenshotPath);
+        return bytes;
+      }
+      if (Date.now() > deadline) {
+        throw new Error(
+          `screenshot stability wait for ${screenshotPath} timed out after ${timeoutMs}ms: ` +
+          `could not confirm two consecutive captures were byte-identical (something kept ` +
+          `repainting that document.getAnimations() could not see).`,
+        );
+      }
+      previous = bytes;
+      previousPath = current;
+    }
+  } finally {
+    fs.rmSync(tmpA, { force: true });
+    fs.rmSync(tmpB, { force: true });
+    await restoreCaret(tauriPage);
+  }
+}
 
 /**
  * Captures a screenshot to `screenshotPath` and validates it from disk --
@@ -154,20 +273,24 @@ export type ScreenshotThresholds = {
  * Validation carries all four checks posted as the shared-helper
  * convention on issue #470: file exists, on-disk size > threshold,
  * distinctSampledColors > threshold, maxChannelRange > threshold.
+ *
+ * PR 480 round 2: before any of that, waits for the screen to be
+ * visually stable (see `waitForScreenStable` above) -- every journey
+ * step's screenshot goes through this one function, so the stability
+ * wait applies everywhere without any journey file asking for it.
  */
 export async function captureAndValidateScreenshot(
   tauriPage: TauriPage,
   screenshotPath: string,
   thresholds: ScreenshotThresholds = {},
 ): Promise<{ onDisk: Buffer; variation: ScreenshotVariation }> {
-  const { minBytes = 1024, minDistinctColors = 10, minChannelRange = 20 } = thresholds;
+  const { minBytes = 1024, minDistinctColors = 10, minChannelRange = 20, stabilityTimeoutMs = 10000 } = thresholds;
 
   fs.mkdirSync(path.dirname(screenshotPath), { recursive: true });
-  await tauriPage.screenshot({ path: screenshotPath });
+  const onDisk = await waitForScreenStable(tauriPage, screenshotPath, stabilityTimeoutMs);
 
   // It must actually have landed on disk at the given path.
   expect(fs.existsSync(screenshotPath)).toBe(true);
-  const onDisk = fs.readFileSync(screenshotPath);
 
   // A sane byte size rules out an empty or truncated file. This alone does
   // NOT rule out a blank frame (see analyzeVariation below) -- a

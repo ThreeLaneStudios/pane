@@ -433,9 +433,10 @@ Nothing at run time depends on an AI model or a scheduled job.
 | --- | --- |
 | Bump PR | Runs every journey as a test and posts a pass or fail list, before Matt's live test. No screenshots are kept. |
 | Public release tag (`vX.Y.Z`) | Runs every journey once against the released build, saves the screenshots, and rebuilds the docs pages. |
+| A PR that changes a journey, a shared helper, or the test setup (`e2e/**`) | Runs via `e2e-linux.yml`'s own `pull_request` `paths` filter, so that PR can prove itself green or honestly red before merge. |
 | Manual (`workflow_dispatch`) | Runs on demand. |
 
-Journeys do not run on ordinary pull requests. A journey broken by an ordinary PR surfaces at the next bump. Dev prereleases do not rebuild the docs.
+Ordinary pull requests — ones that don't touch `e2e/**` — still don't trigger journeys. A journey broken by one of those surfaces at the next bump. Dev prereleases do not rebuild the docs.
 
 #### Rules for writing a journey
 
@@ -446,7 +447,7 @@ Journeys do not run on ordinary pull requests. A journey broken by an ordinary P
 5. **Paid providers are captured up to the setup screens only.** A journey never needs a real key.
 6. **A PR that changes a covered flow updates its journey in the same PR.**
 7. **A journey starts from Home and shows how to reach the feature.** Not from the middle of a flow — the first step's action is the click path a real reader would take to get there.
-8. **Each screenshot is taken after its action, so the result is visible.** A step with no way to check that is a step that shouldn't exist yet. If the action changes a CSS-transitioned property — an element's enabled, disabled, active, or visible state fading, sliding, or recoloring into place — the check must poll the actual painted value (`getComputedStyle`), not the DOM attribute or class that triggers the transition. The attribute or class can flip before the pixels catch up; a check that reads either one can pass while the screenshot still shows the old, mid-transition frame.
+8. **Each screenshot is taken after its action, so the result is visible.** A step with no way to check that is a step that shouldn't exist yet. The runner waits for the screen to be visually stable before every screenshot: all running animations and transitions have finished, and two consecutive captures are identical. Steps do not write their own timing or paint checks.
 9. **A journey ends on the outcome its title promises.** If the real destination differs from what the title implies, the journey captures the real one — it does not stop early to avoid saying so.
 10. **A fork in a flow becomes its own journey, linked from that step.** A journey follows one path start to finish; it does not branch mid-script to cover a second outcome.
 
