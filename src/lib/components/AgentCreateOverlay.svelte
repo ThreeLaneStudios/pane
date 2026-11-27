@@ -215,6 +215,10 @@
 
   // ── Step 2: Seeding ──────────────────────────────────────────────────────
   let createdAgent = $state<Agent | null>(null);
+  // Shared across seedingPath 'none' | 'upload' | 'interview' — all three
+  // reach handleJustChat (skip) and need the failure surfaced wherever the
+  // user happens to be, not inside a single sub-step branch.
+  let seedingError = $state('');
 
   // Seeding sub-step: which card the user picked
   let seedingPath = $state<'none' | 'upload' | 'interview' | 'review'>('none');
@@ -409,11 +413,19 @@
     // read-only "start new session" path and NotificationPanel.svelte's
     // click-to-open already use. 'workspace' is the existing no-project
     // sentinel (see ChatPanel.svelte's own default-agent auto-create call).
-    if (createdAgent) {
-      const session = await sessionStore.createSession('workspace', createdAgent.id);
-      await navigateTo({ view: 'home', sessionId: session.id });
+    seedingError = '';
+    try {
+      if (createdAgent) {
+        const session = await sessionStore.createSession('workspace', createdAgent.id);
+        await navigateTo({ view: 'home', sessionId: session.id });
+      }
+      onClose();
+    } catch (e: any) {
+      // Leave the overlay open on failure — closing unconditionally here
+      // is exactly the #475 regression this PR fixes, just silent: the
+      // user would land back on the Agents list with no error to read.
+      seedingError = e?.message || String(e);
     }
-    onClose();
   }
 
   function handlePickUpload() {
@@ -1034,6 +1046,13 @@
             </button>
           {/if}
         </div>
+      {/if}
+
+      {#if seedingError}
+        <!-- Shared across 'none' | 'upload' | 'interview' — handleJustChat
+             ("Just Start Chatting" / "Skip" / "Skip all") is reachable from
+             all three; render once here instead of once per branch. -->
+        <div class="agent-error">{seedingError}</div>
       {/if}
 
     {/if}
