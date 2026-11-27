@@ -58,3 +58,37 @@ export function renderInlineProse(text: string): string {
   }
   return parts.map((part, i) => (i % 2 === 1 ? `<strong>${escapeHtmlText(part)}</strong>` : escapeHtmlText(part))).join('');
 }
+
+/**
+ * Strips exactly one trailing "." from a step's `title` when building the
+ * displayed `<h2>` heading -- render-time only, never touching the
+ * journey source (`title` strings in `*.journey.ts` keep their trailing
+ * period byte-identical; this function is never called on anything that
+ * gets written back to a file, only on the string passed into the
+ * heading line in `page.ts`).
+ *
+ * Rule, deliberately narrow: strip ONE trailing "." and nothing else.
+ *   - `'Open Settings › Agents.'` -> `'Open Settings › Agents'` (the case
+ *     this PR exists for).
+ *   - A title ending in `?` or `!` is untouched -- this function only
+ *     matches a literal trailing `.`, so `'Ready?'` and `'Go!'` pass
+ *     through unchanged with no special-case code needed.
+ *   - Does not generalize to "strip any trailing punctuation" (which
+ *     would also eat a trailing `?`/`!`) and does not attempt to detect
+ *     or protect an abbreviation (e.g. a hypothetical title ending
+ *     "...etc.") -- none of today's six titles contain one (checked:
+ *     `create-an-agent.journey.ts`'s six `title:` values end in
+ *     "Agents.", "provider.", "model.", "agent.", "ready.", "chatting."
+ *     -- no abbreviation among them), so there is nothing to protect
+ *     against today. Flagging this as a known edge case for whoever
+ *     writes a future journey whose title would end in an abbreviation:
+ *     this strip will remove that period too (turning "etc." into "etc"
+ *     in the heading only -- the caption and manifest `title` field keep
+ *     the full stop), which is wrong for that one case. Caption text is
+ *     never passed through this function at all (it goes through
+ *     `renderInlineProse` directly in `page.ts`), so this can never
+ *     mangle a caption.
+ */
+export function stripTrailingPeriod(title: string): string {
+  return title.endsWith('.') ? title.slice(0, -1) : title;
+}
