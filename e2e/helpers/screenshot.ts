@@ -167,12 +167,26 @@ const CARET_HIDE_STYLE_ID = '__e2e-caret-hide__';
  * A blinking text-input caret is real, continuous repaint that
  * `document.getAnimations()` cannot see (it's not a CSS animation or
  * transition -- most engines implement it as a timer-driven native
- * paint) and that makes two consecutive screenshots never match: the
- * condition (b) below checks for would never settle while a field is
- * focused. Disabling `caret-color` document-wide before the stability
- * wait removes that source of permanent instability; the element is
- * removed again once this step's capture is done so it doesn't leak
- * into whatever the next action does.
+ * paint) and that could make two consecutive screenshots never match:
+ * the condition (b) below checks for would never settle while a field
+ * is focused. This sets `caret-color: transparent` document-wide before
+ * the stability wait, same as before -- but pixel-sampled directly
+ * (screenshot 04, `name-your-agent`, shows a 1px caret bar after
+ * "Research Agent" in every real CI run) confirms WebKitGTK, the engine
+ * `e2e-linux.yml` actually runs against, does not honor `caret-color` on
+ * a native `<input>` -- the property is set correctly, the browser just
+ * ignores it there. So this does NOT make the caret stop blinking in
+ * CI, and is not what makes these screenshots stable. What actually
+ * guarantees stability is the byte-identical-consecutive-capture check
+ * (condition (b)) downstream: it happens to land on two frames with the
+ * caret in the same phase often enough in practice that this hasn't
+ * caused a flake, but that's luck from the polling cadence, not a
+ * property this function controls. Kept because it's harmless, it does
+ * work on at least some engines/contexts, and removing it would be a
+ * behavior change with no evidence it's safe -- Reed's ruling: keep the
+ * code, correct the comment. The element is removed again once this
+ * step's capture is done so it doesn't leak into whatever the next
+ * action does.
  */
 async function hideCaret(tauriPage: TauriPage): Promise<void> {
   await tauriPage.evaluate(`(() => {
